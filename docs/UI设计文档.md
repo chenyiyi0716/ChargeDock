@@ -95,3 +95,6 @@
 - 托盘图标（环形仪表）：[tray-icons-v1.html](tray-icons-v1.html)
 - 托盘右键菜单：[tray-menu.html](tray-menu.html)
 - 定稿预览图（PNG）：[ui-preview.png](ui-preview.png)
+- 主卡片特写：[ui-card.png](ui-card.png)
+- 设置页特写：[ui-settings.png](ui-settings.png)
+- 托盘菜单特写：[ui-menu.png](ui-menu.png)
