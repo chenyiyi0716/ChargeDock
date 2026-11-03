@@ -73,8 +73,22 @@
 
 设计稿见 [tray-icons-v1.html](tray-icons-v1.html)（圆环仪表样式）。
 
-## 9. 设计稿文件
+## 9. 托盘右键菜单
+
+替换系统原生菜单，采用与卡片一致的玻璃风格。菜单项：
+
+- 显示电量 / 隐藏卡片
+- 立即刷新
+- 设置…
+- 开机自启（开关）
+- 关于 ChargeDock
+- 退出（危险色）
+
+提供两版方向：**A 图标分组式**（带状态头与图标，信息更丰富）、**B 极简文字式**（克制冷静）。设计稿见 [tray-menu.html](tray-menu.html)。
+
+## 10. 设计稿文件
 
 - 三方向对比：[ui-designs.html](ui-designs.html)
 - 定稿版：[ui-design-v2.html](ui-design-v2.html)
 - 托盘图标（环形仪表）：[tray-icons-v1.html](tray-icons-v1.html)
+- 托盘右键菜单：[tray-menu.html](tray-menu.html)
