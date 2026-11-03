@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using ChargeDock.Core;
@@ -84,9 +85,9 @@ public static class Program
         }
 
         trayMenu = new TrayMenu();
-        trayMenu.ShowCardRequested += () => flyout.Toggle();
+        trayMenu.ShowCardRequested += () => { RefreshAll(); flyout.Toggle(); };
         trayMenu.RefreshRequested += OnManualRefresh;
-        trayMenu.SettingsRequested += () => { flyout.SetView(true); flyout.Show(); };
+        trayMenu.SettingsRequested += () => { RefreshAll(); flyout.SetView(true); flyout.Show(); };
         trayMenu.AboutRequested += ShowAbout;
         trayMenu.ExitRequested += ExitApp;
 
@@ -99,7 +100,7 @@ public static class Program
             while (true)
             {
                 showEvent.WaitOne();
-                flyout.UiDispatcher.BeginInvoke(new Action(flyout.Show));
+                flyout.UiDispatcher.BeginInvoke(new Action(() => { RefreshAll(); flyout.Show(); }));
             }
         }) { IsBackground = true };
         listener.Start();
@@ -111,6 +112,17 @@ public static class Program
         uiTimer.Start();
 
         RefreshAll();
+
+        // 启动预热:Reader(尤其 BLE 耳机)首帧数据还没就绪,前 25 秒内多刷几次,
+        // 否则卡片会空着等下一次 60s 定时刷新。
+        foreach (int ms in new[] { 800, 2000, 4000, 8000, 15000, 25000 })
+        {
+            Task.Delay(ms).ContinueWith(_ =>
+            {
+                try { flyout.UiDispatcher.BeginInvoke(new Action(RefreshAll)); } catch { }
+            });
+        }
+
         app.Run();
     }
 
@@ -278,7 +290,7 @@ public static class Program
             {
                 if (e.Button == WinForms.MouseButtons.Left)
                 {
-                    flyout.UiDispatcher.BeginInvoke(new Action(flyout.Toggle));
+                    flyout.UiDispatcher.BeginInvoke(new Action(() => { RefreshAll(); flyout.Toggle(); }));
                 }
                 else if (e.Button == WinForms.MouseButtons.Right)
                 {
