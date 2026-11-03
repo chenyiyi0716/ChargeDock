@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{6A5D9E54-0DB7-4F58-A0E0-E0A9BA6F6982}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChargeDock.Core", "src\ChargeDock.Core\ChargeDock.Core.csproj", "{44EC75A8-0672-4291-9A58-5D98EB2676A8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ChargeDock.Devices", "src\ChargeDock.Devices\ChargeDock.Devices.csproj", "{82E64DDB-FD43-4725-9474-AE6DF1790C31}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{44EC75A8-0672-4291-9A58-5D98EB2676A8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{44EC75A8-0672-4291-9A58-5D98EB2676A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{44EC75A8-0672-4291-9A58-5D98EB2676A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{44EC75A8-0672-4291-9A58-5D98EB2676A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{82E64DDB-FD43-4725-9474-AE6DF1790C31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{82E64DDB-FD43-4725-9474-AE6DF1790C31}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{82E64DDB-FD43-4725-9474-AE6DF1790C31}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{82E64DDB-FD43-4725-9474-AE6DF1790C31}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{44EC75A8-0672-4291-9A58-5D98EB2676A8} = {6A5D9E54-0DB7-4F58-A0E0-E0A9BA6F6982}
+		{82E64DDB-FD43-4725-9474-AE6DF1790C31} = {6A5D9E54-0DB7-4F58-A0E0-E0A9BA6F6982}
+	EndGlobalSection
+EndGlobal

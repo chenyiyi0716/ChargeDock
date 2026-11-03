@@ -1,2 +1,15 @@
 # Demo project — not part of this repository
 BatteryWatchDemo/
+
+# .NET build artifacts
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.user
+*.suo
+.vs/
+
+# diagnostics / scratch
+diag.log
+hid.log
+*.tmp
