@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using ChargeDock.Core;
@@ -14,33 +16,37 @@ using Rectangle = System.Windows.Shapes.Rectangle;
 namespace ChargeDock.App;
 
 /// <summary>
-/// 悬浮卡片(WPF 壳)。无边框、置顶、可拖动;内容 = 标题 + 设备卡片 + 底部。
-/// 只依赖 <see cref="IBatteryReader"/> 的读数快照(<see cref="BatteryReading"/>),不碰设备 API。
+/// 玻璃拟态悬浮卡片(重写版)。半透明毛玻璃、22px 大圆角、柔和描边与弥散阴影;
+/// 主卡片 = 标题栏 + 设备列表,设置页 = 通用 / 低电量提醒 / 外观 / 关于 四组。
+/// 含动效:入场淡入上滑、退出淡出、电量条 ScaleX 平滑过渡、开关滑块、切页淡入。
 /// </summary>
 public sealed class Flyout
 {
-    const double Width = 340;
-    const double BarWidth = 128;
+    const double CardWidth = 320;
+    const double ShadowMargin = 18;
+
+    /// <summary>--render 模式置 false,避免动画停在中间态。</summary>
+    public static bool AnimationsEnabled = true;
 
     readonly Window window;
     readonly Border card;
-    readonly TextBlock titleText;
-    TextBlock countText = null!;
-    readonly StackPanel bodyPanel;      // 设备视图或设置视图,二选一
-    readonly TextBlock footText;
-    readonly TextBlock gearText;
-
+    readonly StackPanel bodyPanel;
+    TextBlock titleText = null!;
+    TextBlock statusText = null!;
+    Ellipse statusDot = null!;
+    Viewbox headerIcon = null!;
     bool showSettings;
-    bool userDragged;
-    bool anchored;
 
-    /// <summary>主题变化时(切换深浅色)回调,供主程序刷新托盘图标等。</summary>
-    public Action? ThemeChanged;
+    // 设备行(持久化,更新时不重建,保证电量条动画)
+    DeviceRowView? mouseRow, keyboardRow, headsetRow;
 
     public bool IsVisible => window.IsVisible;
-
-    /// <summary>卡片根元素(供 --render 渲染到 PNG)。</summary>
     public FrameworkElement Card => card;
+    public Dispatcher UiDispatcher => window.Dispatcher;
+
+    /// <summary>任一设置改变时触发(供主程序刷新定时器 / 托盘 / 主题)。</summary>
+    public Action? SettingsChanged;
+    public Action? RefreshRequested;
 
     public Flyout()
     {
@@ -53,27 +59,72 @@ public sealed class Flyout
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.Height,
-            Width = Width,
+            Width = CardWidth + ShadowMargin * 2,
         };
 
+        var shadowHost = new Grid { Margin = new Thickness(ShadowMargin) };
         card = new Border
         {
-            Background = new SolidColorBrush(Theme.Bg),
-            BorderBrush = new SolidColorBrush(Theme.Border),
+            Width = CardWidth,
+            CornerRadius = new CornerRadius(22),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(18, 14, 18, 12),
+            Padding = new Thickness(20),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Effect = new DropShadowEffect
+            {
+                BlurRadius = 22,
+                ShadowDepth = 6,
+                Direction = 270,
+                Opacity = 1,
+                RenderingBias = RenderingBias.Quality,
+            },
         };
 
         var root = new StackPanel();
+        root.Children.Add(BuildHeader());
 
-        // ---------- 标题栏 ----------
+        var divider = new Border { Height = 1, Background = new SolidColorBrush(Theme.Divider), Margin = new Thickness(0, 14, 0, 0) };
+        root.Children.Add(divider);
+
+        bodyPanel = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+        root.Children.Add(bodyPanel);
+
+        card.Child = root;
+        shadowHost.Children.Add(card);
+        window.Content = shadowHost;
+
+        ApplyShellColors();
+        SetView(false, animate: false);
+
+        window.SizeChanged += (_, e) =>
+        {
+            // 内容高度变化时保持贴底(拖动后不再自动贴)
+            if (userDragged) return;
+            var wa = SystemParameters.WorkArea;
+            window.Left = wa.Right - window.Width - 8;
+            window.Top = wa.Bottom - e.NewSize.Height - 8;
+        };
+    }
+
+    bool userDragged;
+
+    void ApplyShellColors()
+    {
+        card.Background = new SolidColorBrush(Theme.CardBg);
+        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
+        if (card.Effect is DropShadowEffect shadow) shadow.Color = Theme.Shadow;
+    }
+
+    // ================= 标题栏 =================
+
+    FrameworkElement BuildHeader()
+    {
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        titleText = Txt("ChargeDock", 15, Theme.Fg, true);
+        titleText = Txt("ChargeDock", 14, Theme.Fg, true);
         titleText.VerticalAlignment = VerticalAlignment.Center;
         titleText.Cursor = Cursors.SizeAll;
         titleText.MouseLeftButtonDown += (_, _) =>
@@ -84,312 +135,453 @@ public sealed class Flyout
         Grid.SetColumn(titleText, 0);
         header.Children.Add(titleText);
 
-        gearText = Txt("⚙", 15, Theme.Dim, false);
-        gearText.Cursor = Cursors.Hand;
-        gearText.Padding = new Thickness(5, 0, 5, 0);
-        gearText.VerticalAlignment = VerticalAlignment.Center;
-        gearText.MouseLeftButtonUp += (_, _) => SetView(!showSettings);
-        Grid.SetColumn(gearText, 1);
-        header.Children.Add(gearText);
+        // 状态:N 已连接
+        var status = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        statusDot = new Ellipse { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center, Fill = new SolidColorBrush(Theme.StatusDot) };
+        status.Children.Add(statusDot);
+        statusText = Txt("0 已连接", 11, Theme.Muted, false);
+        statusText.Margin = new Thickness(5, 0, 0, 0);
+        statusText.VerticalAlignment = VerticalAlignment.Center;
+        status.Children.Add(statusText);
+        Grid.SetColumn(status, 1);
+        header.Children.Add(status);
 
-        var closeText = Txt("✕", 13, Theme.Dim, false);
-        closeText.Cursor = Cursors.Hand;
-        closeText.Padding = new Thickness(5, 0, 0, 0);
-        closeText.VerticalAlignment = VerticalAlignment.Center;
-        closeText.MouseLeftButtonUp += (_, _) => Hide();
-        Grid.SetColumn(closeText, 2);
-        header.Children.Add(closeText);
-
-        root.Children.Add(header);
-        root.Children.Add(Divider());
-
-        // ---------- 内容区(设备视图 / 设置视图) ----------
-        bodyPanel = new StackPanel();
-        root.Children.Add(bodyPanel);
-
-        // ---------- 底部 ----------
-        var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
-        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        footText = Txt("尚未读取", 11, Theme.Dim, false);
-        footText.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(footText, 0);
-        footer.Children.Add(footText);
-
-        var toSettings = Txt("设置 ›", 11, Theme.Muted, false);
-        toSettings.Cursor = Cursors.Hand;
-        toSettings.VerticalAlignment = VerticalAlignment.Center;
-        toSettings.MouseLeftButtonUp += (_, _) => SetView(true);
-        Grid.SetColumn(toSettings, 1);
-        footer.Children.Add(toSettings);
-
-        root.Children.Add(footer);
-        card.Child = root;
-        window.Content = card;
-
-        RebuildBody();
-
-        window.SizeChanged += (_, e) =>
+        // 齿轮 / 关闭(设置入口 / 返回)
+        var headerBtn = new Border
         {
-            if (!anchored || userDragged) return;
-            var wa = SystemParameters.WorkArea;
-            window.Left = wa.Right - Width - 12;
-            window.Top = wa.Bottom - e.NewSize.Height - 12;
+            Width = 26,
+            Height = 26,
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Theme.IconBg),
+            Cursor = Cursors.Hand,
         };
+        headerIcon = new Viewbox { Width = 15, Height = 15, Stretch = Stretch.Uniform };
+        headerIcon.HorizontalAlignment = HorizontalAlignment.Center;
+        headerIcon.VerticalAlignment = VerticalAlignment.Center;
+        headerBtn.Child = headerIcon;
+        headerBtn.MouseLeftButtonUp += (_, _) => SetView(!showSettings);
+        Grid.SetColumn(headerBtn, 2);
+        header.Children.Add(headerBtn);
+
+        return header;
     }
 
-    public void SetView(bool settings)
+    static Canvas DrawClose(Color color)
+    {
+        var c = new Canvas { Width = 24, Height = 24 };
+        var stroke = new SolidColorBrush(color);
+        c.Children.Add(Line(6, 6, 18, 18, stroke, 2));
+        c.Children.Add(Line(18, 6, 6, 18, stroke, 2));
+        return c;
+    }
+
+    // ================= 视图切换 =================
+
+    public void SetView(bool settings) => SetView(settings, animate: true);
+
+    void SetView(bool settings, bool animate)
     {
         showSettings = settings;
         titleText.Text = settings ? "设置" : "ChargeDock";
-        RebuildBody();
-    }
+        if (headerIcon != null)
+            headerIcon.Child = settings ? DrawClose(Theme.IconFg) : DrawGear(Theme.IconFg);
 
-    void RebuildBody()
-    {
+        var content = settings ? BuildSettingsView() : BuildDevicesView();
         bodyPanel.Children.Clear();
-        if (showSettings) bodyPanel.Children.Add(BuildSettings());
-        else bodyPanel.Children.Add(BuildDevicesHeader());
+        bodyPanel.Children.Add(content);
+
+        if (animate && AnimationsEnabled)
+        {
+            content.Opacity = 0;
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+            content.BeginAnimation(UIElement.OpacityProperty, fade);
+        }
     }
 
-    /// <summary>设备视图:状态行 + 设备卡片(内容在 Render 里填充)。</summary>
-    FrameworkElement BuildDevicesHeader()
+    // ================= 设备视图 =================
+
+    FrameworkElement BuildDevicesView()
     {
-        var root = new StackPanel();
-
-        var bar = new Grid();
-        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        countText = Txt("等待设备接入", 12, Theme.Muted, false);
-        countText.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(countText, 0);
-        bar.Children.Add(countText);
-
-        var refresh = Txt("↻", 16, Theme.Dim, false);
-        refresh.Cursor = Cursors.Hand;
-        refresh.Padding = new Thickness(6, 0, 2, 0);
-        refresh.VerticalAlignment = VerticalAlignment.Center;
-        refresh.MouseLeftButtonUp += (_, _) => RefreshRequested?.Invoke();
-        Grid.SetColumn(refresh, 1);
-        bar.Children.Add(refresh);
-        root.Children.Add(bar);
-
-        // 设备卡片容器
-        devicesPanel = new StackPanel();
-        root.Children.Add(devicesPanel);
-
-        return root;
+        var panel = new StackPanel();
+        mouseRow = AddDeviceRow(panel, DeviceKind.Mouse, isFirst: true);
+        keyboardRow = AddDeviceRow(panel, DeviceKind.Keyboard, isFirst: false);
+        headsetRow = AddDeviceRow(panel, DeviceKind.Headset, isFirst: false);
+        return panel;
     }
 
-    StackPanel? devicesPanel;
+    DeviceRowView AddDeviceRow(StackPanel panel, DeviceKind kind, bool isFirst)
+    {
+        var row = new DeviceRowView();
+        var meta = MetaFor(kind);
+        row.Name = Txt(NameFor(kind), 12.5, Theme.Fg, true);
+        row.Meta = Txt(meta, 10.5, Theme.Dim, false);
 
-    public Action? RefreshRequested;
+        var body = new StackPanel();
+        body.Children.Add(row.Name);
+        row.Meta.Margin = new Thickness(0, 1, 0, 0);
+        body.Children.Add(row.Meta);
 
-    /// <summary>按可见读数渲染设备卡片。</summary>
-    public void Render(IReadOnlyList<BatteryReading> visible, bool anyLow, string foot)
+        if (kind == DeviceKind.Headset)
+        {
+            var ears = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            for (int i = 0; i < 3; i++)
+                ears.Children.Add(BuildEarRow(row, i == 0 ? "L" : i == 1 ? "R" : "仓"));
+            body.Children.Add(ears);
+        }
+        else
+        {
+            row.Bar = new Bar();
+            row.Bar.Root.Margin = new Thickness(0, 7, 0, 0);
+            body.Children.Add(row.Bar.Root);
+        }
+
+        var grid = new Grid { Margin = new Thickness(0, isFirst ? 0 : 11, 0, 11) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        row.Icon = new Border
+        {
+            Width = 34,
+            Height = 34,
+            CornerRadius = new CornerRadius(10),
+            Background = new SolidColorBrush(Theme.IconBg),
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        var ivb = new Viewbox { Width = 19, Height = 19, Stretch = Stretch.Uniform, Child = DrawDeviceIcon(kind, Theme.IconFg) };
+        ivb.HorizontalAlignment = HorizontalAlignment.Center;
+        ivb.VerticalAlignment = VerticalAlignment.Center;
+        row.Icon.Child = ivb;
+        Grid.SetColumn(row.Icon, 0);
+        grid.Children.Add(row.Icon);
+
+        body.Margin = new Thickness(11, 0, 0, 0);
+        body.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(body, 1);
+        grid.Children.Add(body);
+
+        if (kind != DeviceKind.Headset)
+        {
+            row.Pct = Txt("—", 13, Theme.Fg, true);
+            row.Pct.MinWidth = 38;
+            row.Pct.TextAlignment = TextAlignment.Right;
+            row.Pct.VerticalAlignment = VerticalAlignment.Center;
+            row.Pct.Margin = new Thickness(10, 0, 0, 0);
+            Grid.SetColumn(row.Pct, 2);
+            grid.Children.Add(row.Pct);
+        }
+
+        row.Root = grid;
+        panel.Children.Add(grid);
+        return row;
+    }
+
+    FrameworkElement BuildEarRow(DeviceRowView parent, string label)
+    {
+        var ear = new EarRow();
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 0) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(18) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) });
+
+        var k = Txt(label, 10, Theme.Muted, true);
+        k.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(k, 0);
+        grid.Children.Add(k);
+
+        ear.Bar = new Bar();
+        Grid.SetColumn(ear.Bar.Root, 1);
+        grid.Children.Add(ear.Bar.Root);
+
+        ear.Pct = Txt("—", 11.5, Theme.Fg, true);
+        ear.Pct.TextAlignment = TextAlignment.Right;
+        ear.Pct.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(ear.Pct, 2);
+        grid.Children.Add(ear.Pct);
+
+        ear.Root = grid;
+        parent.Ears.Add(ear);
+        return grid;
+    }
+
+    /// <summary>按可见读数更新设备行(不重建,保证电量条动画)。</summary>
+    public void Render(IReadOnlyList<BatteryReading> visible)
     {
         if (showSettings) return;
 
         int n = visible.Count;
-        countText.Text = n == 0 ? "等待设备接入" : n + " 台设备";
-        footText.Text = foot;
+        statusText.Text = n == 0 ? "0 已连接" : n + " 已连接";
 
-        // 低电量 → 卡片变色(边框 + 标题变红)
-        card.BorderBrush = new SolidColorBrush(anyLow ? Theme.Red : Theme.Border);
-        titleText.Foreground = new SolidColorBrush(anyLow ? Theme.Red : Theme.Fg);
-
-        if (devicesPanel == null) return;
-        devicesPanel.Children.Clear();
-
-        if (n == 0)
-        {
-            var empty = Txt("暂无已连接的设备", 12, Theme.Dim, false);
-            empty.Margin = new Thickness(0, 8, 0, 0);
-            devicesPanel.Children.Add(empty);
-            return;
-        }
+        // 先全部隐藏
+        foreach (var row in new[] { mouseRow, keyboardRow, headsetRow })
+            if (row != null) row.Root.Visibility = Visibility.Collapsed;
 
         foreach (var r in visible)
         {
-            devicesPanel.Children.Add(DeviceSection(r));
-            if (r != visible[^1]) devicesPanel.Children.Add(Divider());
+            var row = r.Kind switch
+            {
+                DeviceKind.Mouse => mouseRow,
+                DeviceKind.Keyboard => keyboardRow,
+                _ => headsetRow,
+            };
+            if (row == null) continue;
+
+            row.Root.Visibility = Visibility.Visible;
+            row.Name.Text = r.DisplayName;
+
+            bool low = LowBatteryPolicy.IsLowBatteryCandidate(r.Kind)
+                       && r.Battery.HasValue
+                       && r.Battery.Value <= Settings.LowBatteryThreshold
+                       && Settings.CardColorChange;
+
+            if (r.Kind == DeviceKind.Headset)
+            {
+                UpdateEar(row.Ears[0], r.Left);
+                UpdateEar(row.Ears[1], r.Right);
+                UpdateEar(row.Ears[2], r.Case);
+            }
+            else
+            {
+                int level = r.Battery ?? -1;
+                if (level >= 0)
+                {
+                    row.Bar!.Set(level);
+                    row.Pct!.Text = level + "%";
+                    row.Pct.Foreground = new SolidColorBrush(Theme.LevelTextColor(level));
+                }
+                else
+                {
+                    row.Bar!.Set(0);
+                    row.Pct!.Text = "—";
+                    row.Pct.Foreground = new SolidColorBrush(Theme.Dim);
+                }
+            }
+
+            // 低电量 → 该设备变色
+            row.Name.Foreground = new SolidColorBrush(low ? Theme.RedEnd : Theme.Fg);
+            row.Icon.Background = new SolidColorBrush(low
+                ? Color.FromArgb(0x28, Theme.RedEnd.R, Theme.RedEnd.G, Theme.RedEnd.B)
+                : Theme.IconBg);
         }
     }
 
-    FrameworkElement DeviceSection(BatteryReading r)
+    void UpdateEar(EarRow ear, int? level)
     {
-        var root = new StackPanel { Margin = new Thickness(0, 2, 0, 2) };
-
-        // 设备头:图标 + 名称 + 大百分比
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-        Color accent = Theme.Green;
-        var badge = Badge(r.Kind, accent);
-        Grid.SetColumn(badge, 0);
-        head.Children.Add(badge);
-
-        var texts = new StackPanel { Margin = new Thickness(11, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        texts.Children.Add(Txt(r.DisplayName, 14, Theme.Fg, true));
-        var sub = Txt(r.Status, 11, Theme.Dim, false);
-        sub.Margin = new Thickness(0, 2, 0, 0);
-        texts.Children.Add(sub);
-        Grid.SetColumn(texts, 1);
-        head.Children.Add(texts);
-
-        var bigPct = Txt(BigValue(r), 24, Theme.Muted, false);
-        bigPct.Foreground = new SolidColorBrush(Theme.LevelColor(BigLevel(r)));
-        bigPct.VerticalAlignment = VerticalAlignment.Center;
-        bigPct.Margin = new Thickness(10, 0, 0, 0);
-        Grid.SetColumn(bigPct, 2);
-        head.Children.Add(bigPct);
-
-        root.Children.Add(head);
-
-        // 电量条
-        var bars = new StackPanel { Margin = new Thickness(44, 6, 0, 0) };
-
-        if (r.Kind == DeviceKind.Headset)
+        if (level.HasValue)
         {
-            if (r.Left.HasValue) bars.Children.Add(BarLine("左", r.Left.Value));
-            if (r.Right.HasValue) bars.Children.Add(BarLine("右", r.Right.Value));
-            if (r.Case.HasValue) bars.Children.Add(BarLine("仓", r.Case.Value));
+            ear.Root.Visibility = Visibility.Visible;
+            ear.Bar.Set(level.Value);
+            ear.Pct.Text = level + "%";
+            ear.Pct.Foreground = new SolidColorBrush(Theme.LevelTextColor(level.Value));
         }
         else
         {
-            if (r.Battery.HasValue) bars.Children.Add(BarLine("电", r.Battery.Value));
+            ear.Root.Visibility = Visibility.Collapsed;
         }
-
-        root.Children.Add(bars);
-        return root;
-    }
-
-    static int BigLevel(BatteryReading r)
-    {
-        if (r.Kind == DeviceKind.Headset)
-        {
-            int min = int.MaxValue;
-            if (r.Left.HasValue) min = Math.Min(min, r.Left.Value);
-            if (r.Right.HasValue) min = Math.Min(min, r.Right.Value);
-            if (r.Case.HasValue) min = Math.Min(min, r.Case.Value);
-            return min == int.MaxValue ? 100 : min;
-        }
-        return r.Battery ?? 100;
-    }
-
-    static string BigValue(BatteryReading r)
-    {
-        if (r.Kind == DeviceKind.Headset)
-        {
-            int min = BigLevel(r);
-            bool any = r.Left.HasValue || r.Right.HasValue || r.Case.HasValue;
-            return any ? min + "%" : "—";
-        }
-        return r.Battery.HasValue ? r.Battery + "%" : "—";
     }
 
     // ================= 设置视图 =================
 
-    FrameworkElement BuildSettings()
+    FrameworkElement BuildSettingsView()
     {
         var root = new StackPanel();
 
-        root.Children.Add(ToggleRow("开机自启", Settings.StartupEnabled, on => Settings.StartupEnabled = on));
-        root.Children.Add(ToggleRow("低电量提醒", Settings.NotifyEnabled, on => Settings.NotifyEnabled = on));
-        root.Children.Add(ToggleRow("深色主题", Theme.Mode == ThemeMode.Dark, on =>
+        // 通用
+        root.Children.Add(GroupTitle("通用"));
+        root.Children.Add(ToggleRow("开机自启", Settings.StartupEnabled, v =>
         {
-            Settings.DarkTheme = on;
-            Theme.Mode = on ? ThemeMode.Dark : ThemeMode.Light;
-            ApplyTheme();
-            ThemeChanged?.Invoke();
+            Settings.StartupEnabled = v;
+            SettingsChanged?.Invoke();
+        }));
+        root.Children.Add(SegRow("刷新间隔",
+            new[] { "30s", "60s", "5m" },
+            SelectedIndex(new[] { 30, 60, 300 }, Settings.RefreshIntervalSeconds),
+            i =>
+            {
+                Settings.RefreshIntervalSeconds = new[] { 30, 60, 300 }[i];
+                SettingsChanged?.Invoke();
+            }));
+
+        // 低电量提醒
+        root.Children.Add(GroupTitle("低电量提醒 · 鼠标 / 键盘"));
+        root.Children.Add(ToggleRow("启用提醒", Settings.LowBatteryEnabled, v =>
+        {
+            Settings.LowBatteryEnabled = v;
+            SettingsChanged?.Invoke();
+        }));
+        root.Children.Add(StepperRow("提醒阈值", Settings.LowBatteryThreshold, 5, 50, v =>
+        {
+            Settings.LowBatteryThreshold = v;
+            SettingsChanged?.Invoke();
+        }));
+        root.Children.Add(ToggleRow("弹窗提醒", Settings.PopupNotify, v =>
+        {
+            Settings.PopupNotify = v;
+            SettingsChanged?.Invoke();
+        }));
+        root.Children.Add(ToggleRow("卡片变色", Settings.CardColorChange, v =>
+        {
+            Settings.CardColorChange = v;
+            SettingsChanged?.Invoke();
         }));
 
-        var hint = Txt("低电量阈值:15%(鼠标 / 键盘)", 11, Theme.Dim, false);
-        hint.Margin = new Thickness(2, 10, 0, 0);
-        root.Children.Add(hint);
+        // 外观
+        root.Children.Add(GroupTitle("外观"));
+        root.Children.Add(SegRow("主题",
+            new[] { "浅色", "深色", "跟随系统" },
+            ThemeModeIndex(Theme.Mode),
+            i =>
+            {
+                var modes = new[] { ThemeMode.Light, ThemeMode.Dark, ThemeMode.System };
+                Theme.Mode = modes[i];
+                Settings.ThemeMode = Theme.Mode switch
+                {
+                    ThemeMode.Light => "light",
+                    ThemeMode.Dark => "dark",
+                    _ => "system",
+                };
+                ApplyTheme();
+                SettingsChanged?.Invoke();
+            }));
 
-        var back = Txt("‹ 返回", 12, Theme.Muted, false);
-        back.Margin = new Thickness(2, 12, 0, 0);
-        back.Cursor = Cursors.Hand;
-        back.MouseLeftButtonUp += (_, _) => SetView(false);
-        root.Children.Add(back);
+        // 关于
+        root.Children.Add(GroupTitle("关于"));
+        root.Children.Add(AboutRow());
 
         return root;
     }
 
-    Border ToggleRow(string text, bool initial, Action<bool> onChanged)
+    FrameworkElement AboutRow()
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        var mark = Txt(initial ? "✓" : "○", 12, initial ? Theme.Green : Theme.Dim, false);
-        mark.Width = 16;
-        mark.VerticalAlignment = VerticalAlignment.Center;
-        panel.Children.Add(mark);
-        var label = Txt(text, 12, initial ? Theme.Fg : Theme.Muted, false);
-        label.Margin = new Thickness(2, 0, 0, 0);
-        label.VerticalAlignment = VerticalAlignment.Center;
-        panel.Children.Add(label);
+        var grid = new Grid { Margin = new Thickness(0, 9, 0, 0) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        var border = new Border
-        {
-            Padding = new Thickness(10, 7, 12, 7),
-            Margin = new Thickness(0, 3, 0, 3),
-            CornerRadius = new CornerRadius(6),
-            Cursor = Cursors.Hand,
-            Child = panel,
-        };
+        var lab = new StackPanel();
+        var name = Txt("ChargeDock", 13, Theme.Fg, false);
+        var ver = Txt("版本 0.1.0", 10.5, Theme.Dim, false);
+        ver.Margin = new Thickness(0, 1, 0, 0);
+        lab.Children.Add(name);
+        lab.Children.Add(ver);
+        Grid.SetColumn(lab, 0);
+        grid.Children.Add(lab);
 
-        bool isOn = initial;
-        void Refresh()
-        {
-            mark.Text = isOn ? "✓" : "○";
-            mark.Foreground = new SolidColorBrush(isOn ? Theme.Green : Theme.Dim);
-            label.Foreground = new SolidColorBrush(isOn ? Theme.Fg : Theme.Muted);
-            border.Background = new SolidColorBrush(isOn
-                ? Color.FromArgb(0x1F, Theme.Green.R, Theme.Green.G, Theme.Green.B)
-                : Colors.Transparent);
-        }
-        Refresh();
+        var check = Txt("检查更新", 12, Theme.Muted, false);
+        check.Cursor = Cursors.Hand;
+        check.VerticalAlignment = VerticalAlignment.Center;
+        check.MouseLeftButtonUp += (_, _) => { check.Text = "已是最新版本"; };
+        Grid.SetColumn(check, 1);
+        grid.Children.Add(check);
 
-        border.MouseLeftButtonUp += (_, _) =>
-        {
-            isOn = !isOn;
-            Refresh();
-            onChanged(isOn);
-        };
-
-        return border;
+        return grid;
     }
 
-    /// <summary>主题切换后重建整卡(保留当前视图)。</summary>
-    public void ApplyTheme()
+    // ================= 控件 =================
+
+    TextBlock GroupTitle(string text)
     {
-        card.Background = new SolidColorBrush(Theme.Bg);
-        card.BorderBrush = new SolidColorBrush(Theme.Border);
-        RebuildBody();
+        var t = Txt(text, 10, Theme.Muted, true);
+        t.Margin = new Thickness(0, 14, 0, 2);
+        return t;
     }
 
-    // ================= 显示 / 隐藏 =================
+    FrameworkElement ToggleRow(string label, bool initial, Action<bool> onChanged)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 9, 0, 0), MinHeight = 40 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var lab = Txt(label, 13, Theme.Fg, false);
+        lab.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(lab, 0);
+        grid.Children.Add(lab);
+
+        var toggle = new GlassToggle(initial, onChanged);
+        Grid.SetColumn(toggle.Root, 1);
+        grid.Children.Add(toggle.Root);
+
+        return grid;
+    }
+
+    FrameworkElement SegRow(string label, string[] options, int selected, Action<int> onChanged)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 9, 0, 0), MinHeight = 40 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var lab = Txt(label, 13, Theme.Fg, false);
+        lab.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(lab, 0);
+        grid.Children.Add(lab);
+
+        var seg = new SegmentedControl(options, selected, onChanged);
+        Grid.SetColumn(seg.Root, 1);
+        grid.Children.Add(seg.Root);
+
+        return grid;
+    }
+
+    FrameworkElement StepperRow(string label, int value, int min, int max, Action<int> onChanged)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 9, 0, 0), MinHeight = 40 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var lab = Txt(label, 13, Theme.Fg, false);
+        lab.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(lab, 0);
+        grid.Children.Add(lab);
+
+        var stepper = new Stepper(value, min, max, onChanged);
+        Grid.SetColumn(stepper.Root, 1);
+        grid.Children.Add(stepper.Root);
+
+        return grid;
+    }
+
+    // ================= 显示 / 隐藏(动效) =================
 
     public void Show()
     {
+        window.UpdateLayout();
+        var wa = SystemParameters.WorkArea;
         if (!userDragged || !window.IsVisible)
         {
-            window.UpdateLayout();
-            var wa = SystemParameters.WorkArea;
-            double h = window.ActualHeight > 0 ? window.ActualHeight : 300;
-            window.Left = wa.Right - Width - 12;
-            window.Top = wa.Bottom - h - 12;
+            double h = window.ActualHeight > 0 ? window.ActualHeight : 340;
+            window.Left = wa.Right - window.Width - 8;
+            window.Top = wa.Bottom - h - 8;
         }
-        anchored = true;
+
         window.Show();
         window.Activate();
+
+        if (!AnimationsEnabled) { window.Opacity = 1; return; }
+
+        var shift = card.RenderTransform as TranslateTransform;
+        if (shift == null)
+        {
+            shift = new TranslateTransform(0, 0);
+            card.RenderTransform = shift;
+        }
+        window.Opacity = 0;
+        shift.Y = 10;
+
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        window.BeginAnimation(UIElement.OpacityProperty, fade);
+        var slide = new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
-    public void Hide() => window.Hide();
+    public void Hide()
+    {
+        if (!window.IsVisible) return;
+
+        if (!AnimationsEnabled) { window.Hide(); return; }
+
+        var fade = new DoubleAnimation(window.Opacity, 0, TimeSpan.FromMilliseconds(120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+        fade.Completed += (_, _) => { window.Hide(); window.Opacity = 1; };
+        window.BeginAnimation(UIElement.OpacityProperty, fade);
+    }
 
     public void Toggle()
     {
@@ -397,7 +589,12 @@ public sealed class Flyout
         else Show();
     }
 
-    public Dispatcher UiDispatcher => window.Dispatcher;
+    /// <summary>主题切换后重建整卡(保留当前视图),并保留拖拽/动效状态。</summary>
+    public void ApplyTheme()
+    {
+        ApplyShellColors();
+        SetView(showSettings, animate: false);
+    }
 
     // ================= 小工具 =================
 
@@ -409,125 +606,332 @@ public sealed class Flyout
             FontSize = size,
             Foreground = new SolidColorBrush(color),
             TextWrapping = TextWrapping.NoWrap,
+            FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"),
         };
         if (bold) t.FontWeight = FontWeights.SemiBold;
         return t;
     }
 
-    static Border Divider()
+    static string NameFor(DeviceKind kind) => kind switch
     {
-        return new Border
-        {
-            Height = 1,
-            Background = new SolidColorBrush(Theme.Divider),
-            Margin = new Thickness(0, 11, 0, 11),
-        };
+        DeviceKind.Mouse => "HECATE G3M Pro",
+        DeviceKind.Keyboard => "K820",
+        _ => "REDMI Buds 8 Pro",
+    };
+
+    static string MetaFor(DeviceKind kind) => kind switch
+    {
+        DeviceKind.Mouse => "鼠标 · 2.4G",
+        DeviceKind.Keyboard => "键盘 · 2.4G",
+        _ => "耳机 · 蓝牙",
+    };
+
+    static int SelectedIndex(int[] values, int current)
+    {
+        for (int i = 0; i < values.Length; i++) if (values[i] == current) return i;
+        return 1;
     }
 
-    Grid BarLine(string label, int level)
+    static int ThemeModeIndex(ThemeMode m) => m switch
     {
-        var grid = new Grid { Margin = new Thickness(0, 4, 0, 0) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(22) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(BarWidth) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        ThemeMode.Light => 0,
+        ThemeMode.Dark => 1,
+        _ => 2,
+    };
 
-        var lb = Txt(label, 12, Theme.Dim, false);
-        lb.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(lb, 0);
-        grid.Children.Add(lb);
+    // ================= 矢量图标(24×24 线形) =================
 
-        var barHost = new Grid { Width = BarWidth, Height = 7, VerticalAlignment = VerticalAlignment.Center };
-        var track = new Rectangle { Fill = new SolidColorBrush(Theme.Track), RadiusX = 3.5, RadiusY = 3.5 };
-        barHost.Children.Add(track);
-        Color c = Theme.LevelColor(level);
-        var fill = new Rectangle
-        {
-            Fill = new SolidColorBrush(c),
-            RadiusX = 3.5,
-            RadiusY = 3.5,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Width = BarWidth * Math.Max(0, Math.Min(100, level)) / 100.0,
-        };
-        barHost.Children.Add(fill);
-        Grid.SetColumn(barHost, 1);
-        grid.Children.Add(barHost);
-
-        var val = Txt(level + "%", 12, c, false);
-        val.TextAlignment = TextAlignment.Right;
-        val.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(val, 2);
-        grid.Children.Add(val);
-
-        return grid;
-    }
-
-    static Border Badge(DeviceKind kind, Color color)
-    {
-        var b = new Border
-        {
-            Width = 32,
-            Height = 32,
-            CornerRadius = new CornerRadius(9),
-            Background = new SolidColorBrush(Color.FromArgb(0x22, color.R, color.G, color.B)),
-            VerticalAlignment = VerticalAlignment.Top,
-        };
-        var vb = new Viewbox { Width = 18, Height = 18, Stretch = Stretch.Uniform, Child = DrawIcon(kind, color) };
-        vb.HorizontalAlignment = HorizontalAlignment.Center;
-        vb.VerticalAlignment = VerticalAlignment.Center;
-        b.Child = vb;
-        return b;
-    }
-
-    static Canvas DrawIcon(DeviceKind kind, Color color)
+    static Canvas DrawDeviceIcon(DeviceKind kind, Color color)
     {
         var c = new Canvas { Width = 24, Height = 24 };
         var stroke = new SolidColorBrush(color);
-        var fill = new SolidColorBrush(color);
 
-        if (kind == DeviceKind.Headset)
+        if (kind == DeviceKind.Mouse)
+        {
+            c.Children.Add(RoundRect(8, 3, 8, 16, 4, null, stroke, 1.6));
+            c.Children.Add(Line(12, 3, 12, 7, stroke, 1.6));
+        }
+        else if (kind == DeviceKind.Keyboard)
+        {
+            c.Children.Add(RoundRect(2.5, 7, 19, 12, 2, null, stroke, 1.6));
+            c.Children.Add(Line(5.5, 10, 18.5, 10, stroke, 1.4));
+            c.Children.Add(Line(5.5, 13, 18.5, 13, stroke, 1.4));
+            c.Children.Add(Line(5.5, 16, 14.5, 16, stroke, 1.4));
+            c.Children.Add(Line(17, 16, 19.5, 16, stroke, 1.4));
+        }
+        else // headset
         {
             var band = new Path
             {
-                Data = Geometry.Parse("M4.4,16 L4.4,12 A7.6,7.6 0 0 1 19.6,12 L19.6,16"),
+                Data = Geometry.Parse("M4,14 L4,12 A8,8 0 0 1 20,12 L20,14"),
                 Stroke = stroke,
-                StrokeThickness = 2.1,
+                StrokeThickness = 1.6,
+                StrokeStartLineCap = PenLineCap.Round,
+                StrokeEndLineCap = PenLineCap.Round,
             };
-            band.StrokeStartLineCap = PenLineCap.Round;
-            band.StrokeEndLineCap = PenLineCap.Round;
             c.Children.Add(band);
-            c.Children.Add(RoundShape(1.8, 13.4, 5.2, 8.2, 2.6, fill, null, 0));
-            c.Children.Add(RoundShape(17.0, 13.4, 5.2, 8.2, 2.6, fill, null, 0));
-        }
-        else if (kind == DeviceKind.Mouse)
-        {
-            var body = new Path
-            {
-                Data = Geometry.Parse(
-                    "M12,2.5 C7.6,2.5 5.4,6.4 5.4,10.4 L5.4,15.6 C5.4,19.4 8.1,21.5 12,21.5 " +
-                    "C15.9,21.5 18.6,19.4 18.6,15.6 L18.6,10.4 C18.6,6.4 16.4,2.5 12,2.5 Z"),
-                Stroke = stroke,
-                StrokeThickness = 1.8,
-            };
-            body.StrokeLineJoin = PenLineJoin.Round;
-            c.Children.Add(body);
-            c.Children.Add(RoundShape(10.8, 5.5, 2.4, 4.2, 1.2, fill, null, 0));
-        }
-        else // keyboard
-        {
-            c.Children.Add(RoundShape(2.4, 6.6, 19.2, 10.8, 2.2, null, stroke, 1.9));
-            for (int i = 0; i < 4; i++)
-                c.Children.Add(RoundShape(5.4 + i * 3.8, 9.4, 1.9, 1.9, 0.6, fill, null, 0));
-            c.Children.Add(RoundShape(7.6, 13.4, 8.8, 1.8, 0.7, fill, null, 0));
+            c.Children.Add(RoundRect(3.5, 13, 4.5, 7, 2.25, null, stroke, 1.6));
+            c.Children.Add(RoundRect(16, 13, 4.5, 7, 2.25, null, stroke, 1.6));
         }
 
         return c;
     }
 
-    static Rectangle RoundShape(double x, double y, double w, double h, double r, Brush? fill, Brush? stroke, double thickness)
+    static Canvas DrawGear(Color color)
+    {
+        var c = new Canvas { Width = 24, Height = 24 };
+        var stroke = new SolidColorBrush(color);
+        c.Children.Add(new Ellipse { Width = 6, Height = 6, Stroke = stroke, StrokeThickness = 1.7, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
+        c.Children.Add(Line(12, 2.5, 12, 4.5, stroke, 1.7));
+        c.Children.Add(Line(12, 19.5, 12, 21.5, stroke, 1.7));
+        c.Children.Add(Line(2.5, 12, 4.5, 12, stroke, 1.7));
+        c.Children.Add(Line(19.5, 12, 21.5, 12, stroke, 1.7));
+        c.Children.Add(Line(4.6, 4.6, 6, 6, stroke, 1.7));
+        c.Children.Add(Line(18, 18, 19.4, 19.4, stroke, 1.7));
+        c.Children.Add(Line(4.6, 19.4, 6, 18, stroke, 1.7));
+        c.Children.Add(Line(18, 6, 19.4, 4.6, stroke, 1.7));
+        return c;
+    }
+
+    static Rectangle RoundRect(double x, double y, double w, double h, double r, Brush? fill, Brush? stroke, double thickness)
     {
         var rect = new Rectangle { Width = w, Height = h, RadiusX = r, RadiusY = r, Fill = fill, Stroke = stroke, StrokeThickness = thickness };
         Canvas.SetLeft(rect, x);
         Canvas.SetTop(rect, y);
         return rect;
+    }
+
+    static Line Line(double x1, double y1, double x2, double y2, Brush stroke, double thickness)
+    {
+        var l = new Line { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Stroke = stroke, StrokeThickness = thickness };
+        l.StrokeStartLineCap = PenLineCap.Round;
+        l.StrokeEndLineCap = PenLineCap.Round;
+        return l;
+    }
+
+    // ================= 内嵌视图模型 =================
+
+    sealed class DeviceRowView
+    {
+        public FrameworkElement Root = null!;
+        public Border Icon = null!;
+        public TextBlock Name = null!;
+        public TextBlock Meta = null!;
+        public Bar? Bar;
+        public TextBlock? Pct;
+        public readonly List<EarRow> Ears = new();
+    }
+
+    sealed class EarRow
+    {
+        public FrameworkElement Root = null!;
+        public Bar Bar = null!;
+        public TextBlock Pct = null!;
+    }
+
+    /// <summary>圆角进度条:ScaleX 平滑过渡。</summary>
+    sealed class Bar
+    {
+        public Grid Root;
+        public Border Fill = null!;
+        readonly ScaleTransform scale;
+
+        public Bar()
+        {
+            Root = new Grid { Height = 6 };
+            var track = new Border { CornerRadius = new CornerRadius(99), Background = new SolidColorBrush(Theme.BarTrack) };
+            Root.Children.Add(track);
+            Fill = new Border
+            {
+                CornerRadius = new CornerRadius(99),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                RenderTransformOrigin = new Point(0, 0.5),
+            };
+            scale = new ScaleTransform(0, 1);
+            Fill.RenderTransform = scale;
+            Root.Children.Add(Fill);
+        }
+
+        public void Set(int level)
+        {
+            Fill.Background = Theme.LevelBarBrush(level);
+            double to = Math.Max(0, Math.Min(100, level)) / 100.0;
+            if (!AnimationsEnabled) { scale.ScaleX = to; return; }
+            var anim = new DoubleAnimation(scale.ScaleX, to, TimeSpan.FromMilliseconds(320)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+        }
+    }
+
+    /// <summary>iOS 式开关。</summary>
+    sealed class GlassToggle
+    {
+        public Border Root;
+        readonly Border knob;
+        readonly TranslateTransform knobShift;
+        bool isOn;
+        readonly Action<bool> onChanged;
+
+        public GlassToggle(bool initial, Action<bool> onChanged)
+        {
+            this.onChanged = onChanged;
+            isOn = initial;
+
+            Root = new Border
+            {
+                Width = 40,
+                Height = 23,
+                CornerRadius = new CornerRadius(99),
+                Cursor = Cursors.Hand,
+                Background = new SolidColorBrush(initial ? Theme.ToggleOn : Theme.ToggleOff),
+            };
+            knob = new Border
+            {
+                Width = 18,
+                Height = 18,
+                CornerRadius = new CornerRadius(9),
+                Background = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2.5, 0, 0, 0),
+            };
+            knob.Effect = new DropShadowEffect { BlurRadius = 3, ShadowDepth = 1, Opacity = 0.25 };
+            knobShift = new TranslateTransform(initial ? 17 : 0, 0);
+            knob.RenderTransform = knobShift;
+            Root.Child = knob;
+
+            Root.MouseLeftButtonUp += (_, _) => Toggle();
+        }
+
+        void Toggle()
+        {
+            isOn = !isOn;
+            Root.Background = new SolidColorBrush(isOn ? Theme.ToggleOn : Theme.ToggleOff);
+            double to = isOn ? 17 : 0;
+            if (AnimationsEnabled)
+            {
+                var anim = new DoubleAnimation(knobShift.X, to, TimeSpan.FromMilliseconds(180)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+                knobShift.BeginAnimation(TranslateTransform.XProperty, anim);
+            }
+            else knobShift.X = to;
+            onChanged(isOn);
+        }
+    }
+
+    /// <summary>分段选择。</summary>
+    sealed class SegmentedControl
+    {
+        public Border Root;
+        readonly List<Border> buttons = new();
+        readonly Action<int> onChanged;
+
+        public SegmentedControl(string[] options, int selected, Action<int> onChanged)
+        {
+            this.onChanged = onChanged;
+
+            Root = new Border { CornerRadius = new CornerRadius(10), Background = new SolidColorBrush(Theme.SegBg), Padding = new Thickness(3) };
+            var panel = new StackPanel { Orientation = Orientation.Horizontal };
+            for (int i = 0; i < options.Length; i++)
+            {
+                int idx = i;
+                var b = new Border
+                {
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(12, 6, 12, 6),
+                    Cursor = Cursors.Hand,
+                };
+                var t = new TextBlock
+                {
+                    Text = options[i],
+                    FontSize = 12,
+                    FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"),
+                };
+                b.Child = t;
+                b.MouseLeftButtonUp += (_, _) => Select(idx);
+                buttons.Add(b);
+                panel.Children.Add(b);
+            }
+            Root.Child = panel;
+            ApplyVisual(selected);
+        }
+
+        void Select(int idx)
+        {
+            ApplyVisual(idx);
+            onChanged(idx);
+        }
+
+        void ApplyVisual(int idx)
+        {
+            for (int i = 0; i < buttons.Count; i++)
+            {
+                bool on = i == idx;
+                buttons[i].Background = new SolidColorBrush(on ? Theme.SegOnBg : Colors.Transparent);
+                if (on) buttons[i].Effect = new DropShadowEffect { BlurRadius = 6, ShadowDepth = 1, Opacity = 0.16 };
+                else buttons[i].Effect = null;
+                var t = (TextBlock)buttons[i].Child;
+                t.Foreground = new SolidColorBrush(on ? Theme.SegOnFg : Theme.Muted);
+                t.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+            }
+        }
+    }
+
+    /// <summary>−/＋ 步进器。</summary>
+    sealed class Stepper
+    {
+        public Border Root;
+        readonly TextBlock valueText;
+        int value, min, max;
+        readonly Action<int> onChanged;
+
+        public Stepper(int initial, int min, int max, Action<int> onChanged)
+        {
+            value = initial;
+            this.min = min;
+            this.max = max;
+            this.onChanged = onChanged;
+
+            Root = new Border { CornerRadius = new CornerRadius(10), Background = new SolidColorBrush(Theme.SegBg), Padding = new Thickness(3) };
+            var panel = new StackPanel { Orientation = Orientation.Horizontal };
+            panel.Children.Add(StepButton("−", () => Set(value - 1)));
+            valueText = new TextBlock
+            {
+                Width = 44,
+                TextAlignment = TextAlignment.Center,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(Theme.Fg),
+                FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI"),
+            };
+            panel.Children.Add(valueText);
+            panel.Children.Add(StepButton("＋", () => Set(value + 1)));
+            Root.Child = panel;
+            Refresh();
+        }
+
+        Border StepButton(string glyph, Action click)
+        {
+            var b = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(8), Cursor = Cursors.Hand };
+            var t = new TextBlock
+            {
+                Text = glyph,
+                FontSize = 15,
+                Foreground = new SolidColorBrush(Theme.Muted),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            b.Child = t;
+            b.MouseLeftButtonUp += (_, _) => click();
+            return b;
+        }
+
+        void Set(int v)
+        {
+            value = Math.Clamp(v, min, max);
+            Refresh();
+            onChanged(value);
+        }
+
+        void Refresh() => valueText.Text = value + "%";
     }
 }

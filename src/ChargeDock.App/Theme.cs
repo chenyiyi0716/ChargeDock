@@ -1,33 +1,143 @@
 using System.Windows.Media;
 using ChargeDock.Core;
-using Color = System.Windows.Media.Color;
+using Microsoft.Win32;
+
 namespace ChargeDock.App;
 
-public enum ThemeMode { Dark, Light }
+public enum ThemeMode { Light, Dark, System }
 
-/// <summary>配色。切主题时改 <see cref="Mode"/> 然后重建界面即可。</summary>
+/// <summary>
+/// 玻璃拟态配色 + 主题模式(浅色 / 深色 / 跟随系统)。
+/// 颜色取自 docs/ui-design-v2.html(定稿版)。
+/// </summary>
 public static class Theme
 {
-    public static ThemeMode Mode = ThemeMode.Dark;
+    public static ThemeMode Mode = ThemeMode.System;
 
-    public static Color Bg => Mode == ThemeMode.Dark ? Color.FromRgb(0x17, 0x17, 0x1C) : Color.FromRgb(0xFF, 0xFF, 0xFF);
-    public static Color Card => Mode == ThemeMode.Dark ? Color.FromRgb(0x20, 0x20, 0x27) : Color.FromRgb(0xF4, 0xF4, 0xF7);
-    public static Color Border => Mode == ThemeMode.Dark ? Color.FromRgb(0x2E, 0x2E, 0x38) : Color.FromRgb(0xE4, 0xE4, 0xEA);
-    public static Color Divider => Mode == ThemeMode.Dark ? Color.FromRgb(0x2A, 0x2A, 0x33) : Color.FromRgb(0xEC, 0xEC, 0xF0);
-    public static Color Track => Mode == ThemeMode.Dark ? Color.FromRgb(0x33, 0x33, 0x3D) : Color.FromRgb(0xE2, 0xE2, 0xE8);
-    public static Color Fg => Mode == ThemeMode.Dark ? Color.FromRgb(0xEC, 0xEC, 0xF1) : Color.FromRgb(0x1A, 0x1A, 0x1C);
-    public static Color Muted => Mode == ThemeMode.Dark ? Color.FromRgb(0x8A, 0x8A, 0x99) : Color.FromRgb(0x6B, 0x6B, 0x75);
-    public static Color Dim => Mode == ThemeMode.Dark ? Color.FromRgb(0x5A, 0x5A, 0x66) : Color.FromRgb(0x6B, 0x72, 0x80);
-    public static Color Green => Mode == ThemeMode.Dark ? Color.FromRgb(0x3D, 0xDC, 0x97) : Color.FromRgb(0x12, 0xA1, 0x5F);
-    public static Color Amber => Mode == ThemeMode.Dark ? Color.FromRgb(0xFF, 0xCB, 0x47) : Color.FromRgb(0xD9, 0x8A, 0x00);
-    public static Color Red => Mode == ThemeMode.Dark ? Color.FromRgb(0xFF, 0x5C, 0x5C) : Color.FromRgb(0xD9, 0x3A, 0x3A);
-
-    /// <summary>电量对应的颜色。阈值跟随低电量策略默认值(15%)。</summary>
-    public static Color LevelColor(int v)
+    /// <summary>当前是否深色(跟随系统时读注册表 AppsUseLightTheme)。</summary>
+    public static bool IsDark
     {
-        int t = LowBatteryPolicy.DefaultThreshold;
-        if (v <= t) return Red;
-        if (v <= t + 20) return Amber;
-        return Green;
+        get
+        {
+            if (Mode == ThemeMode.Light) return false;
+            if (Mode == ThemeMode.Dark) return true;
+            return SystemUsesDarkTheme();
+        }
     }
+
+    static bool SystemUsesDarkTheme()
+    {
+        try
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            if (k == null) return false;
+            return (int)(k.GetValue("AppsUseLightTheme") ?? 1) == 0;
+        }
+        catch { return false; }
+    }
+
+    // ---- 玻璃卡片 ----
+    /// <summary>卡片背景(半透明毛玻璃底色)。</summary>
+    public static Color CardBg => IsDark
+        ? Color.FromArgb(158, 18, 20, 28)
+        : Color.FromArgb(158, 255, 255, 255);
+
+    /// <summary>卡片描边(柔和)。</summary>
+    public static Color CardBorder => IsDark
+        ? Color.FromArgb(26, 255, 255, 255)
+        : Color.FromArgb(179, 255, 255, 255);
+
+    /// <summary>弥散阴影颜色。</summary>
+    public static Color Shadow => IsDark
+        ? Color.FromArgb(179, 0, 0, 0)
+        : Color.FromArgb(115, 15, 23, 42);
+
+    // ---- 文本 ----
+    public static Color Fg => IsDark
+        ? Color.FromRgb(0xEE, 0xF1, 0xF6)
+        : Color.FromRgb(0x1A, 0x1D, 0x24);
+
+    /// <summary>次要文字(副标 / 元信息,约 50% 不透明度)。</summary>
+    public static Color Dim => IsDark
+        ? Color.FromArgb(128, 0xEE, 0xF1, 0xF6)
+        : Color.FromArgb(128, 0x1A, 0x1D, 0x24);
+
+    /// <summary>更弱的文字(分组标题,约 45% 不透明度)。</summary>
+    public static Color Muted => IsDark
+        ? Color.FromArgb(115, 0xEE, 0xF1, 0xF6)
+        : Color.FromArgb(115, 0x1A, 0x1D, 0x24);
+
+    // ---- 图标 ----
+    public static Color IconBg => IsDark
+        ? Color.FromArgb(20, 255, 255, 255)
+        : Color.FromArgb(13, 0, 0, 0);
+
+    public static Color IconFg => IsDark
+        ? Color.FromRgb(0xCB, 0xD5, 0xE1)
+        : Color.FromRgb(0x33, 0x41, 0x55);
+
+    // ---- 分隔线 / 轨道 ----
+    public static Color Divider => IsDark
+        ? Color.FromArgb(18, 255, 255, 255)
+        : Color.FromArgb(15, 0, 0, 0);
+
+    public static Color BarTrack => IsDark
+        ? Color.FromArgb(26, 255, 255, 255)
+        : Color.FromArgb(20, 0, 0, 0);
+
+    // ---- 控件 ----
+    public static Color ToggleOn => Color.FromRgb(0x63, 0x66, 0xF1);
+
+    public static Color ToggleOff => IsDark
+        ? Color.FromArgb(41, 255, 255, 255)
+        : Color.FromArgb(36, 0, 0, 0);
+
+    public static Color SegBg => IsDark
+        ? Color.FromArgb(26, 255, 255, 255)
+        : Color.FromArgb(15, 0, 0, 0);
+
+    public static Color SegOnBg => IsDark
+        ? Color.FromArgb(235, 255, 255, 255)
+        : Colors.White;
+
+    public static Color SegOnFg => Color.FromRgb(0x11, 0x11, 0x11);
+
+    /// <summary>标题栏右侧「已连接」状态点。</summary>
+    public static Color StatusDot => Color.FromRgb(0x22, 0xC5, 0x5E);
+
+    // ---- 电量颜色(条 + 百分比) ----
+    public static Color GreenStart => Color.FromRgb(0x34, 0xD3, 0x99);
+    public static Color GreenEnd => Color.FromRgb(0x10, 0xB9, 0x81);
+    public static Color AmberStart => Color.FromRgb(0xFB, 0xBF, 0x24);
+    public static Color AmberEnd => Color.FromRgb(0xF5, 0x9E, 0x0B);
+    public static Color RedStart => Color.FromRgb(0xFB, 0x71, 0x85);
+    public static Color RedEnd => Color.FromRgb(0xEF, 0x44, 0x44);
+
+    /// <summary>电量条渐变画刷(绿 / 黄 / 红)。</summary>
+    public static LinearGradientBrush LevelBarBrush(int level)
+    {
+        Color a, b;
+        switch (BatteryColorPolicy.Classify(level))
+        {
+            case BatteryLevelClass.Mid: a = AmberStart; b = AmberEnd; break;
+            case BatteryLevelClass.Low: a = RedStart; b = RedEnd; break;
+            default: a = GreenStart; b = GreenEnd; break;
+        }
+        var brush = new LinearGradientBrush(a, b, new System.Windows.Point(0, 0.5), new System.Windows.Point(1, 0.5));
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>百分比文字颜色:低电量红色,其余跟随前景色。</summary>
+    public static Color LevelTextColor(int level) =>
+        BatteryColorPolicy.Classify(level) == BatteryLevelClass.Low ? RedEnd : Fg;
+
+    /// <summary>电量对应的纯色(托盘图标等需要单色处使用)。</summary>
+    public static Color LevelColor(int level) => BatteryColorPolicy.Classify(level) switch
+    {
+        BatteryLevelClass.Mid => AmberEnd,
+        BatteryLevelClass.Low => RedEnd,
+        _ => GreenEnd,
+    };
 }

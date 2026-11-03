@@ -48,14 +48,17 @@ public static class Program
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
         app.DispatcherUnhandledException += (_, e) => { Log("UI 线程异常: " + e.Exception); e.Handled = true; };
 
+        Theme.Mode = ParseThemeMode(Settings.ThemeMode);
+
         flyout = new Flyout();
         flyout.RefreshRequested += OnManualRefresh;
-        flyout.ThemeChanged += RefreshTrayIconNow;
+        flyout.SettingsChanged += OnSettingsChanged;
 
         // ---- 渲染模式:把卡片画成 PNG,检查布局 ----
         if (args.Length >= 2 && args[0] == "--render")
         {
-            flyout.Render(FakeReadings(), false, "上次更新 12:00:00");
+            Flyout.AnimationsEnabled = false;
+            flyout.Render(FakeReadings());
             RenderToFile(args[1]);
             return;
         }
@@ -84,12 +87,26 @@ public static class Program
 
         FirstRunTip();
 
-        uiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        uiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(Settings.RefreshIntervalSeconds) };
         uiTimer.Tick += (_, _) => RefreshAll();
         uiTimer.Start();
 
         RefreshAll();
         app.Run();
+    }
+
+    static ThemeMode ParseThemeMode(string s) => s switch
+    {
+        "light" => ThemeMode.Light,
+        "dark" => ThemeMode.Dark,
+        _ => ThemeMode.System,
+    };
+
+    static void OnSettingsChanged()
+    {
+        if (uiTimer != null)
+            uiTimer.Interval = TimeSpan.FromSeconds(Settings.RefreshIntervalSeconds);
+        RefreshTrayIconNow();
     }
 
     static void OnManualRefresh()
@@ -122,18 +139,11 @@ public static class Program
         var readings = readers.Select(r => r.Snapshot()).ToList();
         var visible = DeviceDisplayPolicy.SelectVisible(readings).ToList();
 
-        bool anyLow = visible.Any(r => LowLevel(r) is int v && v <= LowBatteryPolicy.DefaultThreshold);
-        flyout.Render(visible, anyLow, "上次更新 " + DateTime.Now.ToString("HH:mm:ss"));
+        flyout.Render(visible);
 
         UpdateTray(visible);
         CheckLowBattery(visible);
     }
-
-    static int? LowLevel(BatteryReading r) => r.Kind switch
-    {
-        DeviceKind.Mouse or DeviceKind.Keyboard => r.Battery,
-        _ => null,
-    };
 
     static int MinLevel(BatteryReading r)
     {
@@ -147,8 +157,8 @@ public static class Program
 
     static void CheckLowBattery(IReadOnlyList<BatteryReading> visible)
     {
-        if (!Settings.NotifyEnabled) return;
-        int threshold = LowBatteryPolicy.DefaultThreshold;
+        if (!Settings.LowBatteryEnabled || !Settings.PopupNotify) return;
+        int threshold = Settings.LowBatteryThreshold;
 
         foreach (var r in visible)
         {
@@ -349,15 +359,16 @@ public static class Program
 
     static List<BatteryReading> FakeReadings() => new()
     {
-        new BatteryReading { Kind = DeviceKind.Mouse, DisplayName = "HECATE G3M PRO", Battery = 95, Connected = true, Status = "已连接", LastSeen = DateTime.Now },
-        new BatteryReading { Kind = DeviceKind.Headset, DisplayName = "REDMI Buds 8 Pro", Left = 80, Right = 60, Connected = true, Status = "双耳已连接", LastSeen = DateTime.Now },
+        new BatteryReading { Kind = DeviceKind.Mouse, DisplayName = "HECATE G3M PRO", Battery = 82, Connected = true },
+        new BatteryReading { Kind = DeviceKind.Keyboard, DisplayName = "K820", Battery = 12, Connected = true },
+        new BatteryReading { Kind = DeviceKind.Headset, DisplayName = "REDMI Buds 8 Pro", Left = 45, Right = 70, Case = 100, Connected = true },
     };
 
     static void RenderToFile(string path)
     {
         var root = flyout.Card;
-        root.Measure(new Size(340, double.PositiveInfinity));
-        root.Arrange(new Rect(0, 0, 340, root.DesiredSize.Height));
+        root.Measure(new Size(320, double.PositiveInfinity));
+        root.Arrange(new Rect(0, 0, 320, root.DesiredSize.Height));
         root.UpdateLayout();
 
         var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
