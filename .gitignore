@@ -14,3 +14,6 @@ diag.log
 hid.log
 *.tmp
 .tools/
+
+# installer payload (自包含主程序,发布时生成,不入库)
+src/ChargeDock.Installer/payload/

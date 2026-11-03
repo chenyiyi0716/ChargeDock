@@ -1,5 +1,5 @@
 using System;
-using System.Reflection;
+using System.IO;
 using Microsoft.Win32;
 
 namespace ChargeDock.App;
@@ -64,7 +64,9 @@ public static class Settings
             if (k == null) return;
             if (value)
             {
-                string exe = Assembly.GetExecutingAssembly().Location;
+                // 单文件应用里 Assembly.Location 为空,用 ProcessPath 取真实 exe 路径
+                string exe = Environment.ProcessPath
+                    ?? Path.Combine(AppContext.BaseDirectory, "ChargeDock.exe");
                 k.SetValue(RunName, "\"" + exe + "\" --tray");
             }
             else
