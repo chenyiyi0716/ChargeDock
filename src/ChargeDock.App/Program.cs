@@ -359,7 +359,7 @@ public static class Program
 
     static List<BatteryReading> FakeReadings() => new()
     {
-        new BatteryReading { Kind = DeviceKind.Mouse, DisplayName = "HECATE G3M PRO", Battery = 82, Connected = true },
+        new BatteryReading { Kind = DeviceKind.Mouse, DisplayName = "HECATE G3M Pro", Battery = 82, Connected = true },
         new BatteryReading { Kind = DeviceKind.Keyboard, DisplayName = "K820", Battery = 12, Connected = true },
         new BatteryReading { Kind = DeviceKind.Headset, DisplayName = "REDMI Buds 8 Pro", Left = 45, Right = 70, Case = 100, Connected = true },
     };

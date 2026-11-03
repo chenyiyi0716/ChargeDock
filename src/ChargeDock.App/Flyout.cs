@@ -354,11 +354,6 @@ public sealed class Flyout
             row.Root.Visibility = Visibility.Visible;
             row.Name.Text = r.DisplayName;
 
-            bool low = LowBatteryPolicy.IsLowBatteryCandidate(r.Kind)
-                       && r.Battery.HasValue
-                       && r.Battery.Value <= Settings.LowBatteryThreshold
-                       && Settings.CardColorChange;
-
             if (r.Kind == DeviceKind.Headset)
             {
                 UpdateEar(row.Ears[0], r.Left);
@@ -382,11 +377,9 @@ public sealed class Flyout
                 }
             }
 
-            // 低电量 → 该设备变色
-            row.Name.Foreground = new SolidColorBrush(low ? Theme.RedEnd : Theme.Fg);
-            row.Icon.Background = new SolidColorBrush(low
-                ? Color.FromArgb(0x28, Theme.RedEnd.R, Theme.RedEnd.G, Theme.RedEnd.B)
-                : Theme.IconBg);
+            // 设计稿:低电量只让电量条/百分比变红,设备名与图标保持常规配色
+            row.Name.Foreground = new SolidColorBrush(Theme.Fg);
+            row.Icon.Background = new SolidColorBrush(Theme.IconBg);
         }
     }
 

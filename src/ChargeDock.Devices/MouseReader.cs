@@ -28,7 +28,7 @@ public sealed class MouseReader : IBatteryReader
     bool started;
 
     public DeviceKind Kind => DeviceKind.Mouse;
-    public string DisplayName => "HECATE G3M PRO";
+    public string DisplayName => "HECATE G3M Pro";
 
     public int Battery => battery;
     public bool Charging => charging;
