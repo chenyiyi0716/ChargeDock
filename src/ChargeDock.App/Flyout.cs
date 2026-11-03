@@ -32,10 +32,13 @@ public sealed class Flyout
     readonly Window window;
     readonly Border card;
     readonly StackPanel bodyPanel;
+    StackPanel root = null!;
     TextBlock titleText = null!;
+    StackPanel statusPanel = null!;
     TextBlock statusText = null!;
     Ellipse statusDot = null!;
-    Viewbox headerIcon = null!;
+    Border gearBtn = null!;
+    Border closeBtn = null!;
     Border? headerDivider;
     bool showSettings;
 
@@ -72,7 +75,7 @@ public sealed class Flyout
             Background = Brushes.Transparent,
         };
 
-        var root = new StackPanel();
+        root = new StackPanel();
         root.Children.Add(BuildHeader());
 
         headerDivider = new Border { Height = 1, Background = new SolidColorBrush(Theme.Divider), Margin = new Thickness(0, 14, 0, 0) };
@@ -131,41 +134,60 @@ public sealed class Flyout
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-        titleText = Txt("ChargeDock", 14, Theme.Fg, true);
+        titleText = Txt("ChargeDock", 15, Theme.Fg, true);
         titleText.VerticalAlignment = VerticalAlignment.Center;
         Grid.SetColumn(titleText, 0);
         header.Children.Add(titleText);
 
         // 状态:N 已连接
-        var status = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        statusPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
         statusDot = new Ellipse { Width = 6, Height = 6, VerticalAlignment = VerticalAlignment.Center, Fill = new SolidColorBrush(Theme.StatusDot) };
-        status.Children.Add(statusDot);
+        statusPanel.Children.Add(statusDot);
         statusText = Txt("0 已连接", 11, Theme.Muted, false);
         statusText.Margin = new Thickness(5, 0, 0, 0);
         statusText.VerticalAlignment = VerticalAlignment.Center;
-        status.Children.Add(statusText);
-        Grid.SetColumn(status, 1);
-        header.Children.Add(status);
+        statusPanel.Children.Add(statusText);
+        Grid.SetColumn(statusPanel, 1);
+        header.Children.Add(statusPanel);
 
-        // 齿轮 / 关闭(设置入口 / 返回)
-        var headerBtn = new Border
+        // 齿轮(打开设置)
+        gearBtn = HeaderButton(DrawGear(Theme.IconFg));
+        gearBtn.Margin = new Thickness(0, 0, 8, 0);
+        gearBtn.MouseLeftButtonUp += (_, _) => SetView(true);
+        Grid.SetColumn(gearBtn, 2);
+        header.Children.Add(gearBtn);
+
+        // 关闭(卡片视图 → 收起;设置视图 → 返回卡片)
+        closeBtn = HeaderButton(DrawClose(Theme.IconFg));
+        closeBtn.MouseLeftButtonUp += (_, _) =>
         {
-            Width = 26,
-            Height = 26,
+            if (showSettings) SetView(false);
+            else Hide();
+        };
+        Grid.SetColumn(closeBtn, 3);
+        header.Children.Add(closeBtn);
+
+        return header;
+    }
+
+    Border HeaderButton(Canvas icon)
+    {
+        var b = new Border
+        {
+            Width = 28,
+            Height = 28,
             CornerRadius = new CornerRadius(8),
             Background = new SolidColorBrush(Theme.IconBg),
             Cursor = Cursors.Hand,
+            VerticalAlignment = VerticalAlignment.Center,
         };
-        headerIcon = new Viewbox { Width = 15, Height = 15, Stretch = Stretch.Uniform };
-        headerIcon.HorizontalAlignment = HorizontalAlignment.Center;
-        headerIcon.VerticalAlignment = VerticalAlignment.Center;
-        headerBtn.Child = headerIcon;
-        headerBtn.MouseLeftButtonUp += (_, _) => SetView(!showSettings);
-        Grid.SetColumn(headerBtn, 2);
-        header.Children.Add(headerBtn);
-
-        return header;
+        var vb = new Viewbox { Width = 16, Height = 16, Stretch = Stretch.Uniform, Child = icon };
+        vb.HorizontalAlignment = HorizontalAlignment.Center;
+        vb.VerticalAlignment = VerticalAlignment.Center;
+        b.Child = vb;
+        return b;
     }
 
     static Canvas DrawClose(Color color)
@@ -185,8 +207,9 @@ public sealed class Flyout
     {
         showSettings = settings;
         titleText.Text = settings ? "设置" : "ChargeDock";
-        if (headerIcon != null)
-            headerIcon.Child = settings ? DrawClose(Theme.IconFg) : DrawGear(Theme.IconFg);
+        // 设置视图:隐藏「N 已连接」与齿轮,只留关闭(返回卡片)
+        if (statusPanel != null) statusPanel.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
+        if (gearBtn != null) gearBtn.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
 
         var content = settings ? BuildSettingsView() : BuildDevicesView();
         bodyPanel.Children.Clear();
@@ -215,7 +238,7 @@ public sealed class Flyout
     {
         var row = new DeviceRowView();
         var meta = MetaFor(kind);
-        row.Name = Txt(NameFor(kind), 12.5, Theme.Fg, true);
+        row.Name = Txt(NameFor(kind), 13.5, Theme.Fg, true);
         row.Meta = Txt(meta, 10.5, Theme.Dim, false);
 
         var body = new StackPanel();
@@ -244,13 +267,13 @@ public sealed class Flyout
 
         row.Icon = new Border
         {
-            Width = 34,
-            Height = 34,
-            CornerRadius = new CornerRadius(10),
+            Width = 44,
+            Height = 44,
+            CornerRadius = new CornerRadius(11),
             Background = new SolidColorBrush(Theme.IconBg),
             VerticalAlignment = VerticalAlignment.Top,
         };
-        var ivb = new Viewbox { Width = 19, Height = 19, Stretch = Stretch.Uniform, Child = DrawDeviceIcon(kind, Theme.IconFg) };
+        var ivb = new Viewbox { Width = 24, Height = 24, Stretch = Stretch.Uniform, Child = DrawDeviceIcon(kind, Theme.IconFg) };
         ivb.HorizontalAlignment = HorizontalAlignment.Center;
         ivb.VerticalAlignment = VerticalAlignment.Center;
         row.Icon.Child = ivb;
@@ -264,7 +287,7 @@ public sealed class Flyout
 
         if (kind != DeviceKind.Headset)
         {
-            row.Pct = Txt("—", 13, Theme.Fg, true);
+            row.Pct = Txt("—", 14, Theme.Fg, true);
             row.Pct.MinWidth = 38;
             row.Pct.TextAlignment = TextAlignment.Right;
             row.Pct.VerticalAlignment = VerticalAlignment.Center;
@@ -588,15 +611,44 @@ public sealed class Flyout
         else Show();
     }
 
-    /// <summary>主题切换后重建整卡(保留当前视图)。</summary>
+    /// <summary>主题切换:淡出旧内容 → 换主题 → 淡入新内容,形成平滑过渡。</summary>
     public void ApplyTheme()
     {
+        if (AnimationsEnabled && window.IsVisible)
+        {
+            var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(130)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+            fadeOut.Completed += (_, _) =>
+            {
+                DoApplyTheme();
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(240)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+                root.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            };
+            root.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+        }
+        else
+        {
+            root.Opacity = 1;
+            DoApplyTheme();
+        }
+    }
+
+    void DoApplyTheme()
+    {
         ApplyShellColors();
-        // 头部不是每次重建的,这里同步刷新配色,避免切换主题后标题/状态仍是旧主题颜色
         titleText.Foreground = new SolidColorBrush(Theme.Fg);
         statusText.Foreground = new SolidColorBrush(Theme.Muted);
         statusDot.Fill = new SolidColorBrush(Theme.StatusDot);
         if (headerDivider != null) headerDivider.Background = new SolidColorBrush(Theme.Divider);
+        if (gearBtn != null)
+        {
+            gearBtn.Background = new SolidColorBrush(Theme.IconBg);
+            if (gearBtn.Child is Viewbox gv) gv.Child = DrawGear(Theme.IconFg);
+        }
+        if (closeBtn != null)
+        {
+            closeBtn.Background = new SolidColorBrush(Theme.IconBg);
+            if (closeBtn.Child is Viewbox cv) cv.Child = DrawClose(Theme.IconFg);
+        }
         SetView(showSettings, animate: false);
     }
 
@@ -742,7 +794,7 @@ public sealed class Flyout
 
         public Bar()
         {
-            Root = new Grid { Height = 6 };
+            Root = new Grid { Height = 7 };
             var track = new Border { CornerRadius = new CornerRadius(99), Background = new SolidColorBrush(Theme.BarTrack) };
             Root.Children.Add(track);
             Fill = new Border
