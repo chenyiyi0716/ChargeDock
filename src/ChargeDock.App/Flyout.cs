@@ -574,6 +574,12 @@ public sealed class Flyout
 
     // ================= 显示 / 隐藏(动效) =================
 
+    /// <summary>卡片已显示时不重复弹出(用于托盘菜单「显示电量」,避免把卡片收起来)。</summary>
+    public void ShowIfHidden()
+    {
+        if (!window.IsVisible) Show();
+    }
+
     public void Show()
     {
         // 首帧窗口尚未布局(ActualHeight 为 0),先测量卡片内容拿到真实高度,避免首次定位偏移
@@ -581,27 +587,42 @@ public sealed class Flyout
         double h = card.DesiredSize.Height > 0 ? card.DesiredSize.Height : 340;
 
         var wa = SystemParameters.WorkArea;
+        double finalTop = wa.Bottom - h - 8;
         window.Left = wa.Right - window.Width - 8;
-        window.Top = wa.Bottom - h - 8;
 
+        if (!AnimationsEnabled)
+        {
+            window.Top = finalTop;
+            window.Show();
+            window.Activate();
+            window.Opacity = 1;
+            return;
+        }
+
+        // 从下往上弹出:窗口从略低于目标位置处滑入,同时淡入
+        const double slideDistance = 40;
+        double startTop = finalTop + slideDistance;
+        window.Top = startTop;
+        window.Opacity = 0;
         window.Show();
         window.Activate();
 
-        if (!AnimationsEnabled) { window.Opacity = 1; return; }
-
-        var shift = card.RenderTransform as TranslateTransform;
-        if (shift == null)
+        var slide = new DoubleAnimation(startTop, finalTop, TimeSpan.FromMilliseconds(300))
         {
-            shift = new TranslateTransform(0, 0);
-            card.RenderTransform = shift;
-        }
-        window.Opacity = 0;
-        shift.Y = 10;
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        slide.Completed += (_, _) =>
+        {
+            window.BeginAnimation(Window.TopProperty, null);
+            window.Top = finalTop;
+        };
+        window.BeginAnimation(Window.TopProperty, slide);
 
-        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
         window.BeginAnimation(UIElement.OpacityProperty, fade);
-        var slide = new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(220)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
     public void Hide()
