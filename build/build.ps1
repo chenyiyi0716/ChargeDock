@@ -11,10 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $dotnet = Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe'
-if (-not (Test-Path $dotnet)) {
-    # 兜底:尝试系统 PATH 上的 dotnet
-    $dotnet = 'dotnet'
-}
+if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
 
 $repo = Split-Path -Parent $PSScriptRoot
 $sln  = Join-Path $repo 'ChargeDock.sln'
@@ -24,16 +21,13 @@ Write-Host "dotnet = $dotnet" -ForegroundColor DarkGray
 & $dotnet restore $sln -nologo
 if ($LASTEXITCODE -ne 0) { throw "restore failed" }
 
-if (-not $NoTest) {
-    & $dotnet build $sln -c Release -nologo
-    if ($LASTEXITCODE -ne 0) { throw "build failed" }
+& $dotnet build $sln -c Release -nologo
+if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
-    & $dotnet test (Join-Path $repo 'tests\ChargeDock.Tests\ChargeDock.Tests.csproj') -c Release --no-build -nologo
+if (-not $NoTest) {
+    # 用 xunit 控制台运行器跑测试(规避 VSTest testhost 在沙箱中 OpenProcess 被拒的问题)
+    & (Join-Path $PSScriptRoot 'run-tests.ps1')
     if ($LASTEXITCODE -ne 0) { throw "tests failed" }
-}
-else {
-    & $dotnet build $sln -c Release -nologo
-    if ($LASTEXITCODE -ne 0) { throw "build failed" }
 }
 
 if ($Publish) {
