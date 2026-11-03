@@ -25,6 +25,8 @@ static class GlassEffect
 
     const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     const int DWMWCP_ROUND = 2;
+    const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    const int DWMSBT_TRANSIENTWINDOW = 3;   // Acrylic
 
     [StructLayout(LayoutKind.Sequential)]
     struct AccentPolicy
@@ -86,6 +88,23 @@ static class GlassEffect
         {
             int pref = DWMWCP_ROUND;
             return DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int)) == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Windows 11 系统级亚克力背景(DWM 管理,会跟随窗口圆角一起裁剪)。dark 控制明暗着色。</summary>
+    public static bool ApplySystemAcrylic(IntPtr hwnd, bool dark)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+        try
+        {
+            int darkMode = dark ? 1 : 0;
+            DwmSetWindowAttribute(hwnd, 20, ref darkMode, sizeof(int)); // DWMWA_USE_IMMERSIVE_DARK_MODE
+            int type = DWMSBT_TRANSIENTWINDOW;
+            return DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref type, sizeof(int)) == 0;
         }
         catch
         {

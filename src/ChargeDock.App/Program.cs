@@ -65,6 +65,16 @@ public static class Program
             return;
         }
 
+        if (args.Length >= 2 && args[0] == "--render-settings")
+        {
+            Flyout.AnimationsEnabled = false;
+            flyout.ShowSettingsForRender();
+            flyout.Render(FakeReadings());
+            flyout.ApplyRenderFallback();
+            RenderToFile(args[1]);
+            return;
+        }
+
         // ---- 单实例 ----
         using var mutex = new Mutex(true, MutexName, out bool createdNew);
         if (!createdNew)

@@ -55,13 +55,12 @@ public sealed class Flyout
 
     public Flyout()
     {
-        // 分层窗口:卡片圆角由 Border 的 CornerRadius 决定。
-        // 非分层窗口用 SetWindowRgn 裁圆角时,裁不住 DWM 合成的亚克力层,角落会露出方形。
+        // 经典亚克力毛玻璃(SetWindowCompositionAttribute)+ 圆角窗口区域。
         window = new Window
         {
             WindowStyle = WindowStyle.None,
-            AllowsTransparency = true,
-            Background = Brushes.Transparent,
+            AllowsTransparency = false,
+            Background = new SolidColorBrush(Theme.SolidCardBg),
             ShowInTaskbar = false,
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
@@ -73,10 +72,7 @@ public sealed class Flyout
         {
             CornerRadius = new CornerRadius(22),
             Padding = new Thickness(20),
-            Background = new SolidColorBrush(Theme.CardBg),
-            BorderBrush = new SolidColorBrush(Theme.CardBorder),
-            BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect { BlurRadius = 28, ShadowDepth = 0, Opacity = 0.32, Color = Colors.Black },
+            Background = Brushes.Transparent,
         };
 
         root = new StackPanel();
@@ -94,8 +90,10 @@ public sealed class Flyout
         ApplyShellColors();
         SetView(false, animate: false);
 
+        window.SourceInitialized += (_, _) => { ApplyAcrylic(); ApplyRegion(); };
         window.SizeChanged += (_, e) =>
         {
+            ApplyRegion();
             // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
             window.Left = wa.Right - window.Width - 8;
@@ -103,15 +101,35 @@ public sealed class Flyout
         };
     }
 
+    void ApplyAcrylic()
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        GlassEffect.ApplyAcrylic(hwnd, Theme.AcrylicTint);
+        // 设置亚克力(DWM)可能重置窗口区域,这里重新裁一次圆角
+        ApplyRegion();
+    }
+
+    void ApplyRegion()
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        int w = (int)window.ActualWidth;
+        int h = (int)window.ActualHeight;
+        if (w > 0 && h > 0) GlassEffect.ApplyRoundedRegion(hwnd, w, h, 22);
+    }
+
     void ApplyShellColors()
     {
-        if (card == null) return;
-        card.Background = new SolidColorBrush(Theme.CardBg);
-        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
+        window.Background = new SolidColorBrush(Theme.SolidCardBg);
+        if (window.IsVisible) ApplyAcrylic();
     }
 
     /// <summary>--render 用:亚克力只在真实窗口生效,渲染时给卡片一个可见底色。</summary>
     public void ApplyRenderFallback() => card.Background = new SolidColorBrush(Theme.CardBg);
+
+    /// <summary>--render-settings 用:切到设置视图。</summary>
+    public void ShowSettingsForRender() => SetView(true, animate: false);
 
     // ================= 标题栏 =================
 

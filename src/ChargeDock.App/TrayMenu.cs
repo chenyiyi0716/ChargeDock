@@ -42,8 +42,8 @@ public sealed class TrayMenu
         window = new Window
         {
             WindowStyle = WindowStyle.None,
-            AllowsTransparency = true,
-            Background = Brushes.Transparent,
+            AllowsTransparency = false,
+            Background = new SolidColorBrush(Theme.SolidCardBg),
             ShowInTaskbar = false,
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
@@ -54,24 +54,29 @@ public sealed class TrayMenu
         {
             CornerRadius = new CornerRadius(Radius),
             Padding = new Thickness(6),
-            Background = new SolidColorBrush(Theme.CardBg),
-            BorderBrush = new SolidColorBrush(Theme.CardBorder),
-            BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect { BlurRadius = 20, ShadowDepth = 0, Opacity = 0.3, Color = Colors.Black },
+            Background = Brushes.Transparent,
         };
         panel = new StackPanel { Width = MenuWidth };
         card.Child = panel;
         window.Content = card;
 
+        window.SourceInitialized += (_, _) => ApplyGlass();
         window.Deactivated += (_, _) => Hide();
         window.KeyDown += (_, e) => { if (e.Key == Key.Escape) Hide(); };
+    }
+
+    void ApplyGlass()
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        GlassEffect.ApplyAcrylic(hwnd, Theme.AcrylicTint);
+        if (window.ActualWidth > 0 && window.ActualHeight > 0)
+            GlassEffect.ApplyRoundedRegion(hwnd, (int)window.ActualWidth, (int)window.ActualHeight, (int)Radius);
     }
 
     void Build()
     {
         panel.Children.Clear();
-        card.Background = new SolidColorBrush(Theme.CardBg);
-        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
 
         // 显示电量(+ 最低电量提示)
         showHint = Txt("—", 11, Theme.Muted, false);
