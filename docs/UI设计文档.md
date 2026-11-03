@@ -94,3 +94,4 @@
 - 定稿版：[ui-design-v2.html](ui-design-v2.html)
 - 托盘图标（环形仪表）：[tray-icons-v1.html](tray-icons-v1.html)
 - 托盘右键菜单：[tray-menu.html](tray-menu.html)
+- 定稿预览图（PNG）：[ui-preview.png](ui-preview.png)
