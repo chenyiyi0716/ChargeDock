@@ -1,0 +1,384 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Windows;
+using System.Windows.Threading;
+using ChargeDock.Core;
+using ChargeDock.Devices;
+using WinForms = System.Windows.Forms;
+using Gdi = System.Drawing;
+
+namespace ChargeDock.App;
+
+public static class Program
+{
+    const string MutexName = "ChargeDock_SingleInstance";
+    const string ShowEventName = "ChargeDock_ShowPanel";
+
+    static readonly List<IBatteryReader> readers = new()
+    {
+        new MouseReader(),
+        new KeyboardReader(),
+        new HeadsetReader(),
+    };
+
+    static Flyout flyout = null!;
+    static WinForms.NotifyIcon? tray;
+    static DispatcherTimer? uiTimer;
+    static SynchronizationContext? trayContext;
+    static readonly ManualResetEvent trayReady = new(false);
+    static int lastIconLevel = -2;
+    static IntPtr currentIconHandle;
+    static readonly Dictionary<DeviceKind, int> notified = new();
+
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        WinForms.Application.SetHighDpiMode(WinForms.HighDpiMode.PerMonitorV2);
+
+        // ---- 诊断模式:不开界面 ----
+        if (args.Length >= 2 && args[0] == "--selftest")
+        {
+            RunSelfTest(args[1]);
+            return;
+        }
+
+        var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        app.DispatcherUnhandledException += (_, e) => { Log("UI 线程异常: " + e.Exception); e.Handled = true; };
+
+        flyout = new Flyout();
+        flyout.RefreshRequested += OnManualRefresh;
+        flyout.ThemeChanged += RefreshTrayIconNow;
+
+        // ---- 渲染模式:把卡片画成 PNG,检查布局 ----
+        if (args.Length >= 2 && args[0] == "--render")
+        {
+            flyout.Render(FakeReadings(), false, "上次更新 12:00:00");
+            RenderToFile(args[1]);
+            return;
+        }
+
+        // ---- 单实例 ----
+        using var mutex = new Mutex(true, MutexName, out bool createdNew);
+        if (!createdNew)
+        {
+            try { EventWaitHandle.OpenExisting(ShowEventName).Set(); } catch { }
+            return;
+        }
+
+        BuildTray();
+        foreach (var r in readers) r.Start();
+
+        var showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowEventName);
+        var listener = new Thread(() =>
+        {
+            while (true)
+            {
+                showEvent.WaitOne();
+                flyout.UiDispatcher.BeginInvoke(new Action(flyout.Show));
+            }
+        }) { IsBackground = true };
+        listener.Start();
+
+        FirstRunTip();
+
+        uiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        uiTimer.Tick += (_, _) => RefreshAll();
+        uiTimer.Start();
+
+        RefreshAll();
+        app.Run();
+    }
+
+    static void OnManualRefresh()
+    {
+        foreach (var r in readers) r.RequestRefresh();
+        RefreshAll();
+    }
+
+    static void FirstRunTip()
+    {
+        if (Settings.TipShown) return;
+        PostTray(() =>
+        {
+            try
+            {
+                tray?.ShowBalloonTip(6000, "ChargeDock 已启动",
+                    "图标在右下角托盘里。如果没看到,点任务栏的 ^ 展开,把它拖到外面。",
+                    WinForms.ToolTipIcon.Info);
+            }
+            catch { }
+        });
+        try { Settings.TipShown = true; } catch { }
+        flyout.UiDispatcher.BeginInvoke(new Action(flyout.Show), DispatcherPriority.ApplicationIdle);
+    }
+
+    // ================= 数据刷新 =================
+
+    static void RefreshAll()
+    {
+        var readings = readers.Select(r => r.Snapshot()).ToList();
+        var visible = DeviceDisplayPolicy.SelectVisible(readings).ToList();
+
+        bool anyLow = visible.Any(r => LowLevel(r) is int v && v <= LowBatteryPolicy.DefaultThreshold);
+        flyout.Render(visible, anyLow, "上次更新 " + DateTime.Now.ToString("HH:mm:ss"));
+
+        UpdateTray(visible);
+        CheckLowBattery(visible);
+    }
+
+    static int? LowLevel(BatteryReading r) => r.Kind switch
+    {
+        DeviceKind.Mouse or DeviceKind.Keyboard => r.Battery,
+        _ => null,
+    };
+
+    static int MinLevel(BatteryReading r)
+    {
+        int min = int.MaxValue;
+        if (r.Battery.HasValue) min = Math.Min(min, r.Battery.Value);
+        if (r.Left.HasValue) min = Math.Min(min, r.Left.Value);
+        if (r.Right.HasValue) min = Math.Min(min, r.Right.Value);
+        if (r.Case.HasValue) min = Math.Min(min, r.Case.Value);
+        return min == int.MaxValue ? -1 : min;
+    }
+
+    static void CheckLowBattery(IReadOnlyList<BatteryReading> visible)
+    {
+        if (!Settings.NotifyEnabled) return;
+        int threshold = LowBatteryPolicy.DefaultThreshold;
+
+        foreach (var r in visible)
+        {
+            if (!LowBatteryPolicy.IsLowBatteryCandidate(r.Kind)) continue;
+            if (!r.Battery.HasValue) continue;
+            int level = r.Battery.Value;
+
+            if (LowBatteryPolicy.ShouldReset(level, threshold))
+            {
+                notified.Remove(r.Kind);
+                continue;
+            }
+
+            int? last = notified.TryGetValue(r.Kind, out var l) ? l : null;
+            if (!LowBatteryPolicy.ShouldAlert(level, threshold, last)) continue;
+
+            notified[r.Kind] = level;
+            string name = r.DisplayName;
+            PostTray(() =>
+            {
+                try
+                {
+                    tray?.ShowBalloonTip(6000, "电量偏低", name + " 剩余 " + level + "%",
+                        level <= 10 ? WinForms.ToolTipIcon.Error : WinForms.ToolTipIcon.Warning);
+                }
+                catch { }
+            });
+        }
+    }
+
+    // ================= 托盘 =================
+
+    static void BuildTray()
+    {
+        var t = new Thread(TrayThread) { IsBackground = true };
+        t.SetApartmentState(ApartmentState.STA);
+        t.Start();
+        trayReady.WaitOne(5000);
+    }
+
+    static void PostTray(Action action)
+    {
+        var ctx = trayContext;
+        if (ctx == null) { action(); return; }
+        try { ctx.Post(_ => action(), null); } catch { }
+    }
+
+    static void TrayThread()
+    {
+        try
+        {
+            WinForms.Application.EnableVisualStyles();
+            SynchronizationContext.SetSynchronizationContext(new WinForms.WindowsFormsSynchronizationContext());
+            trayContext = SynchronizationContext.Current!;
+
+            tray = new WinForms.NotifyIcon
+            {
+                Icon = MakeIcon(-1),
+                Text = "ChargeDock",
+                Visible = true,
+            };
+
+            tray.MouseClick += (_, e) =>
+            {
+                if (e.Button != WinForms.MouseButtons.Left) return;
+                flyout.UiDispatcher.BeginInvoke(new Action(flyout.Toggle));
+            };
+
+            var menu = new WinForms.ContextMenuStrip();
+
+            var show = new WinForms.ToolStripMenuItem("显示电量");
+            show.Click += (_, _) => flyout.UiDispatcher.BeginInvoke(new Action(flyout.Show));
+
+            var refresh = new WinForms.ToolStripMenuItem("立即刷新");
+            refresh.Click += (_, _) => flyout.UiDispatcher.BeginInvoke(new Action(OnManualRefresh));
+
+            var startup = new WinForms.ToolStripMenuItem("开机自启") { CheckOnClick = true, Checked = Settings.StartupEnabled };
+            startup.Click += (_, _) => Settings.StartupEnabled = startup.Checked;
+
+            var exit = new WinForms.ToolStripMenuItem("退出");
+            exit.Click += (_, _) => ExitApp();
+
+            menu.Items.Add(show);
+            menu.Items.Add(refresh);
+            menu.Items.Add(new WinForms.ToolStripSeparator());
+            menu.Items.Add(startup);
+            menu.Items.Add(new WinForms.ToolStripSeparator());
+            menu.Items.Add(exit);
+            tray.ContextMenuStrip = menu;
+
+            trayReady.Set();
+            WinForms.Application.Run();
+        }
+        catch (Exception ex)
+        {
+            Log("托盘线程异常: " + ex);
+            trayReady.Set();
+        }
+    }
+
+    static Gdi.Icon MakeIcon(int level)
+    {
+        var color = level < 0 ? Gdi.Color.FromArgb(0x8A, 0x8A, 0x99) : ToGdi(Theme.LevelColor(level));
+        using var bmp = TrayIconFactory.Render(level, color);
+        IntPtr h = bmp.GetHicon();
+        currentIconHandle = h;
+        return Gdi.Icon.FromHandle(h);
+    }
+
+    static Gdi.Color ToGdi(System.Windows.Media.Color c) => Gdi.Color.FromArgb(c.R, c.G, c.B);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+    static extern bool DestroyIcon(IntPtr handle);
+
+    static string BuildTrayTip(IReadOnlyList<BatteryReading> visible)
+    {
+        var sb = new System.Text.StringBuilder("ChargeDock");
+        foreach (var r in visible)
+        {
+            sb.Append(" · ");
+            if (r.Kind == DeviceKind.Headset)
+            {
+                var parts = new List<string>();
+                if (r.Left.HasValue) parts.Add("L" + r.Left + "%");
+                if (r.Right.HasValue) parts.Add("R" + r.Right + "%");
+                if (r.Case.HasValue) parts.Add("C" + r.Case + "%");
+                sb.Append(parts.Count > 0 ? string.Join("/", parts) : r.DisplayName);
+            }
+            else
+            {
+                sb.Append(r.Battery + "%");
+            }
+        }
+        string text = sb.ToString();
+        return text.Length > 62 ? text.Substring(0, 62) : text;
+    }
+
+    static void UpdateTray(IReadOnlyList<BatteryReading> visible)
+    {
+        if (tray == null) return;
+
+        int level = -1;
+        foreach (var r in visible)
+        {
+            int l = MinLevel(r);
+            if (l >= 0) level = level < 0 ? l : Math.Min(level, l);
+        }
+
+        string text = BuildTrayTip(visible);
+
+        PostTray(() =>
+        {
+            if (tray == null) return;
+            if (Math.Abs(level - lastIconLevel) >= 2 || lastIconLevel == -2)
+            {
+                lastIconLevel = level;
+                Gdi.Icon? oldIcon = tray.Icon;
+                IntPtr oldHandle = currentIconHandle;
+                tray.Icon = MakeIcon(level);
+                oldIcon?.Dispose();
+                if (oldHandle != IntPtr.Zero) DestroyIcon(oldHandle);
+            }
+            tray.Text = text;
+        });
+    }
+
+    static void RefreshTrayIconNow()
+    {
+        lastIconLevel = -2;
+        RefreshAll();
+    }
+
+    static void ExitApp()
+    {
+        uiTimer?.Stop();
+        PostTray(() =>
+        {
+            if (tray != null) { tray.Visible = false; tray.Dispose(); tray = null; }
+            WinForms.Application.ExitThread();
+        });
+        flyout.UiDispatcher.BeginInvoke(new Action(() => Application.Current.Shutdown()));
+    }
+
+    // ================= 诊断 =================
+
+    static void RunSelfTest(string path)
+    {
+        foreach (var r in readers) r.Start();
+        Thread.Sleep(20000);
+        var sb = new System.Text.StringBuilder();
+        foreach (var r in readers)
+        {
+            var snap = r.Snapshot();
+            sb.AppendLine(snap.ToString());
+        }
+        File.WriteAllText(path, sb.ToString());
+    }
+
+    static List<BatteryReading> FakeReadings() => new()
+    {
+        new BatteryReading { Kind = DeviceKind.Mouse, DisplayName = "HECATE G3M PRO", Battery = 95, Connected = true, Status = "已连接", LastSeen = DateTime.Now },
+        new BatteryReading { Kind = DeviceKind.Headset, DisplayName = "REDMI Buds 8 Pro", Left = 80, Right = 60, Connected = true, Status = "双耳已连接", LastSeen = DateTime.Now },
+    };
+
+    static void RenderToFile(string path)
+    {
+        var root = flyout.Card;
+        root.Measure(new Size(340, double.PositiveInfinity));
+        root.Arrange(new Rect(0, 0, 340, root.DesiredSize.Height));
+        root.UpdateLayout();
+
+        var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            (int)Math.Ceiling(root.ActualWidth), (int)Math.Ceiling(root.ActualHeight),
+            96, 96, System.Windows.Media.PixelFormats.Pbgra32);
+        rtb.Render(root);
+
+        var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(rtb));
+        using var fs = File.Create(path);
+        encoder.Save(fs);
+    }
+
+    static void Log(string msg)
+    {
+        try
+        {
+            File.AppendAllText(
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "diag.log"),
+                DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + Environment.NewLine);
+        }
+        catch { }
+    }
+}
