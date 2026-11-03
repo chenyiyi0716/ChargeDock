@@ -25,6 +25,7 @@ public static class Program
     };
 
     static Flyout flyout = null!;
+    static TrayMenu? trayMenu;
     static WinForms.NotifyIcon? tray;
     static DispatcherTimer? uiTimer;
     static SynchronizationContext? trayContext;
@@ -59,6 +60,7 @@ public static class Program
         {
             Flyout.AnimationsEnabled = false;
             flyout.Render(FakeReadings());
+            flyout.ApplyRenderFallback();
             RenderToFile(args[1]);
             return;
         }
@@ -70,6 +72,13 @@ public static class Program
             try { EventWaitHandle.OpenExisting(ShowEventName).Set(); } catch { }
             return;
         }
+
+        trayMenu = new TrayMenu();
+        trayMenu.ShowCardRequested += () => flyout.Toggle();
+        trayMenu.RefreshRequested += OnManualRefresh;
+        trayMenu.SettingsRequested += () => { flyout.SetView(true); flyout.Show(); };
+        trayMenu.AboutRequested += ShowAbout;
+        trayMenu.ExitRequested += ExitApp;
 
         BuildTray();
         foreach (var r in readers) r.Start();
@@ -107,6 +116,12 @@ public static class Program
         if (uiTimer != null)
             uiTimer.Interval = TimeSpan.FromSeconds(Settings.RefreshIntervalSeconds);
         RefreshTrayIconNow();
+    }
+
+    static void ShowAbout()
+    {
+        MessageBox.Show("ChargeDock v0.1.0\n\n常驻桌面的个人外设电量卡片。\n鼠标 / 键盘 / 耳机左右耳电量一目了然。",
+            "关于 ChargeDock", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     static void OnManualRefresh()
@@ -223,31 +238,17 @@ public static class Program
 
             tray.MouseClick += (_, e) =>
             {
-                if (e.Button != WinForms.MouseButtons.Left) return;
-                flyout.UiDispatcher.BeginInvoke(new Action(flyout.Toggle));
+                if (e.Button == WinForms.MouseButtons.Left)
+                {
+                    flyout.UiDispatcher.BeginInvoke(new Action(flyout.Toggle));
+                }
+                else if (e.Button == WinForms.MouseButtons.Right)
+                {
+                    var pos = WinForms.Cursor.Position;
+                    int x = pos.X, y = pos.Y;
+                    flyout.UiDispatcher.BeginInvoke(new Action(() => trayMenu?.ShowAt(x, y)));
+                }
             };
-
-            var menu = new WinForms.ContextMenuStrip();
-
-            var show = new WinForms.ToolStripMenuItem("显示电量");
-            show.Click += (_, _) => flyout.UiDispatcher.BeginInvoke(new Action(flyout.Show));
-
-            var refresh = new WinForms.ToolStripMenuItem("立即刷新");
-            refresh.Click += (_, _) => flyout.UiDispatcher.BeginInvoke(new Action(OnManualRefresh));
-
-            var startup = new WinForms.ToolStripMenuItem("开机自启") { CheckOnClick = true, Checked = Settings.StartupEnabled };
-            startup.Click += (_, _) => Settings.StartupEnabled = startup.Checked;
-
-            var exit = new WinForms.ToolStripMenuItem("退出");
-            exit.Click += (_, _) => ExitApp();
-
-            menu.Items.Add(show);
-            menu.Items.Add(refresh);
-            menu.Items.Add(new WinForms.ToolStripSeparator());
-            menu.Items.Add(startup);
-            menu.Items.Add(new WinForms.ToolStripSeparator());
-            menu.Items.Add(exit);
-            tray.ContextMenuStrip = menu;
 
             trayReady.Set();
             WinForms.Application.Run();
@@ -261,14 +262,11 @@ public static class Program
 
     static Gdi.Icon MakeIcon(int level)
     {
-        var color = level < 0 ? Gdi.Color.FromArgb(0x8A, 0x8A, 0x99) : ToGdi(Theme.LevelColor(level));
-        using var bmp = TrayIconFactory.Render(level, color);
+        using var bmp = TrayIconFactory.Render(level);
         IntPtr h = bmp.GetHicon();
         currentIconHandle = h;
         return Gdi.Icon.FromHandle(h);
     }
-
-    static Gdi.Color ToGdi(System.Windows.Media.Color c) => Gdi.Color.FromArgb(c.R, c.G, c.B);
 
     [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
     static extern bool DestroyIcon(IntPtr handle);
@@ -306,6 +304,8 @@ public static class Program
             int l = MinLevel(r);
             if (l >= 0) level = level < 0 ? l : Math.Min(level, l);
         }
+
+        trayMenu?.SetBattery(level);
 
         string text = BuildTrayTip(visible);
 

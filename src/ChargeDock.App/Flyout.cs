@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
@@ -50,34 +51,24 @@ public sealed class Flyout
 
     public Flyout()
     {
+        // 亚克力毛玻璃需要非分层窗口(AllowsTransparency=false),圆角交给 SetWindowRgn 实现
         window = new Window
         {
             WindowStyle = WindowStyle.None,
-            AllowsTransparency = true,
-            Background = Brushes.Transparent,
+            AllowsTransparency = false,
+            Background = new SolidColorBrush(Theme.SolidCardBg),
             ShowInTaskbar = false,
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.Height,
-            Width = CardWidth + ShadowMargin * 2,
+            Width = CardWidth,
         };
 
-        var shadowHost = new Grid { Margin = new Thickness(ShadowMargin) };
         card = new Border
         {
-            Width = CardWidth,
             CornerRadius = new CornerRadius(22),
-            BorderThickness = new Thickness(1),
             Padding = new Thickness(20),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            Effect = new DropShadowEffect
-            {
-                BlurRadius = 22,
-                ShadowDepth = 6,
-                Direction = 270,
-                Opacity = 1,
-                RenderingBias = RenderingBias.Quality,
-            },
+            Background = Brushes.Transparent,
         };
 
         var root = new StackPanel();
@@ -90,30 +81,46 @@ public sealed class Flyout
         root.Children.Add(bodyPanel);
 
         card.Child = root;
-        shadowHost.Children.Add(card);
-        window.Content = shadowHost;
+        window.Content = card;
 
         ApplyShellColors();
         SetView(false, animate: false);
 
+        window.SourceInitialized += (_, _) => { ApplyAcrylic(); ApplyRegion(); };
         window.SizeChanged += (_, e) =>
         {
-            // 内容高度变化时保持贴底(拖动后不再自动贴)
-            if (userDragged) return;
+            ApplyRegion();
+            // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
             window.Left = wa.Right - window.Width - 8;
             window.Top = wa.Bottom - e.NewSize.Height - 8;
         };
     }
 
-    bool userDragged;
+    void ApplyAcrylic()
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        GlassEffect.ApplyAcrylic(hwnd, Theme.AcrylicTint);
+    }
+
+    void ApplyRegion()
+    {
+        var hwnd = new WindowInteropHelper(window).Handle;
+        if (hwnd == IntPtr.Zero) return;
+        int w = (int)window.ActualWidth;
+        int h = (int)window.ActualHeight;
+        if (w > 0 && h > 0) GlassEffect.ApplyRoundedRegion(hwnd, w, h, 22);
+    }
 
     void ApplyShellColors()
     {
-        card.Background = new SolidColorBrush(Theme.CardBg);
-        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
-        if (card.Effect is DropShadowEffect shadow) shadow.Color = Theme.Shadow;
+        window.Background = new SolidColorBrush(Theme.SolidCardBg);
+        if (window.IsVisible) ApplyAcrylic();
     }
+
+    /// <summary>--render 用:亚克力只在真实窗口生效,渲染时给卡片一个可见底色。</summary>
+    public void ApplyRenderFallback() => card.Background = new SolidColorBrush(Theme.CardBg);
 
     // ================= 标题栏 =================
 
@@ -126,12 +133,6 @@ public sealed class Flyout
 
         titleText = Txt("ChargeDock", 14, Theme.Fg, true);
         titleText.VerticalAlignment = VerticalAlignment.Center;
-        titleText.Cursor = Cursors.SizeAll;
-        titleText.MouseLeftButtonDown += (_, _) =>
-        {
-            try { window.DragMove(); userDragged = true; }
-            catch { }
-        };
         Grid.SetColumn(titleText, 0);
         header.Children.Add(titleText);
 
@@ -545,12 +546,9 @@ public sealed class Flyout
     {
         window.UpdateLayout();
         var wa = SystemParameters.WorkArea;
-        if (!userDragged || !window.IsVisible)
-        {
-            double h = window.ActualHeight > 0 ? window.ActualHeight : 340;
-            window.Left = wa.Right - window.Width - 8;
-            window.Top = wa.Bottom - h - 8;
-        }
+        double h = window.ActualHeight > 0 ? window.ActualHeight : 340;
+        window.Left = wa.Right - window.Width - 8;
+        window.Top = wa.Bottom - h - 8;
 
         window.Show();
         window.Activate();

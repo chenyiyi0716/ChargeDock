@@ -1,71 +1,52 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Drawing.Text;
+using ChargeDock.Core;
 
 namespace ChargeDock.App;
 
 /// <summary>
-/// 托盘图标绘制(GDI+)。画一个电池图标,按电量填充,颜色由调用方按电量算好。
-/// level 传 -1 表示还没读到数据。
+/// 托盘图标绘制(GDI+):环形仪表 —— 环形进度,弧长表示电量。
+/// 颜色随电量(绿 / 黄 / 红);轨道色随系统深浅色。level 传 -1 表示未知。
 /// </summary>
 public static class TrayIconFactory
 {
-    public static Bitmap Render(int level, Color color)
+    public static Bitmap Render(int level, int size = 32)
     {
-        var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
+        var bmp = new Bitmap(size, size);
+        using var g = Graphics.FromImage(bmp);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.Clear(Color.Transparent);
+
+        bool unknown = level < 0;
+        int v = unknown ? 0 : Math.Clamp(level, 0, 100);
+        Color arc = unknown ? Color.FromArgb(0x8A, 0x8A, 0x99) : LevelColor(level);
+        Color track = Theme.SystemIsDark ? Color.FromArgb(0x2F, 0x35, 0x3D) : Color.FromArgb(0xDD, 0xE1, 0xE6);
+
+        // 设计稿 viewBox 100×100:r=42,stroke=9,按实际尺寸等比缩放
+        float scale = size / 100f;
+        float r = 42 * scale;
+        float sw = 9 * scale;
+        float cx = 50 * scale;
+        float cy = 50 * scale;
+        var rect = new RectangleF(cx - r, cy - r, 2 * r, 2 * r);
+
+        using (var trackPen = new Pen(track, sw))
+            g.DrawEllipse(trackPen, rect);
+
+        if (!unknown && v > 0)
         {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-            g.Clear(Color.Transparent);
-
-            bool unknown = level < 0;
-            int v = unknown ? 0 : Math.Max(0, Math.Min(100, level));
-            Color c = unknown ? Color.FromArgb(0x8A, 0x8A, 0x99) : color;
-
-            DrawBattery(g, v, unknown, c);
+            using var arcPen = new Pen(arc, sw) { StartCap = LineCap.Round, EndCap = LineCap.Round };
+            g.DrawArc(arcPen, rect, -90, 360f * v / 100f);
         }
+
         return bmp;
     }
 
-    static void DrawBattery(Graphics g, int v, bool unknown, Color c)
+    static Color LevelColor(int level) => BatteryColorPolicy.Classify(level) switch
     {
-        // 电池外壳 + 正极小凸点
-        using var bodyPen = new Pen(c, 2.2f);
-        using var bodyPath = RoundRect(4f, 9f, 21f, 14f, 3f);
-        g.DrawPath(bodyPen, bodyPath);
-
-        using var nubBrush = new SolidBrush(c);
-        g.FillRectangle(nubBrush, 26f, 13f, 2.6f, 6f);
-
-        if (unknown)
-        {
-            // 未知:画一条横线
-            using var linePen = new Pen(c, 2.2f);
-            g.DrawLine(linePen, 9f, 16f, 20f, 16f);
-            return;
-        }
-
-        if (v > 0)
-        {
-            int w = (int)Math.Round(17 * v / 100.0);
-            if (w < 1) w = 1;
-            using var fillBrush = new SolidBrush(c);
-            using var fillPath = RoundRect(6.2f, 11.2f, w, 9.6f, 1.6f);
-            g.FillPath(fillBrush, fillPath);
-        }
-    }
-
-    static GraphicsPath RoundRect(float x, float y, float w, float h, float r)
-    {
-        var p = new GraphicsPath();
-        float d = r * 2;
-        p.AddArc(x, y, d, d, 180, 90);
-        p.AddArc(x + w - d, y, d, d, 270, 90);
-        p.AddArc(x + w - d, y + h - d, d, d, 0, 90);
-        p.AddArc(x, y + h - d, d, d, 90, 90);
-        p.CloseFigure();
-        return p;
-    }
+        BatteryLevelClass.Mid => Color.FromArgb(0xF5, 0x9E, 0x0B),
+        BatteryLevelClass.Low => Color.FromArgb(0xEF, 0x44, 0x44),
+        _ => Color.FromArgb(0x22, 0xC5, 0x5E),
+    };
 }

@@ -37,11 +37,24 @@ public static class Theme
         catch { return false; }
     }
 
+    /// <summary>系统是否为深色(用于托盘图标轨道色匹配任务栏)。</summary>
+    public static bool SystemIsDark => SystemUsesDarkTheme();
+
     // ---- 玻璃卡片 ----
     /// <summary>卡片背景(半透明毛玻璃底色)。</summary>
     public static Color CardBg => IsDark
         ? Color.FromArgb(158, 18, 20, 28)
         : Color.FromArgb(158, 255, 255, 255);
+
+    /// <summary>非分层窗口的实色背景(亚克力不可用时的兜底)。</summary>
+    public static Color SolidCardBg => IsDark
+        ? Color.FromRgb(0x12, 0x14, 0x1C)
+        : Colors.White;
+
+    /// <summary>亚克力着色(alpha 控制着色强度)。</summary>
+    public static Color AcrylicTint => IsDark
+        ? Color.FromArgb(0xC0, 0x12, 0x14, 0x1C)
+        : Color.FromArgb(0xC0, 0xFF, 0xFF, 0xFF);
 
     /// <summary>卡片描边(柔和)。</summary>
     public static Color CardBorder => IsDark
@@ -105,6 +118,11 @@ public static class Theme
 
     /// <summary>标题栏右侧「已连接」状态点。</summary>
     public static Color StatusDot => Color.FromRgb(0x22, 0xC5, 0x5E);
+
+    /// <summary>菜单项悬停底色。</summary>
+    public static Color HoverBg => IsDark
+        ? Color.FromArgb(20, 255, 255, 255)
+        : Color.FromArgb(15, 0, 0, 0);
 
     // ---- 电量颜色(条 + 百分比) ----
     public static Color GreenStart => Color.FromRgb(0x34, 0xD3, 0x99);
