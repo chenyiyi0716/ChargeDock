@@ -41,6 +41,8 @@ public sealed class Flyout
     Border closeBtn = null!;
     Border? headerDivider;
     bool showSettings;
+    /// <summary>最近一次读数缓存:视图重建(主题切换/视图切换)后回填,避免数据空白。</summary>
+    List<BatteryReading> lastReadings = new();
 
     // 设备行(持久化,更新时不重建,保证电量条动画)
     DeviceRowView? mouseRow, keyboardRow, headsetRow;
@@ -220,6 +222,9 @@ public sealed class Flyout
         bodyPanel.Children.Clear();
         bodyPanel.Children.Add(content);
 
+        // 重建后回填当前读数(主题切换 / 视图切换不会丢数据)
+        if (!settings) ApplyReadings(lastReadings);
+
         if (animate && AnimationsEnabled)
         {
             content.Opacity = 0;
@@ -337,8 +342,13 @@ public sealed class Flyout
     /// <summary>按可见读数更新设备行(不重建,保证电量条动画)。</summary>
     public void Render(IReadOnlyList<BatteryReading> visible)
     {
+        lastReadings = new List<BatteryReading>(visible);
         if (showSettings) return;
+        ApplyReadings(lastReadings);
+    }
 
+    void ApplyReadings(IReadOnlyList<BatteryReading> visible)
+    {
         int n = visible.Count;
         statusText.Text = n == 0 ? "0 已连接" : n + " 已连接";
 
@@ -566,9 +576,11 @@ public sealed class Flyout
 
     public void Show()
     {
-        window.UpdateLayout();
+        // 首帧窗口尚未布局(ActualHeight 为 0),先测量卡片内容拿到真实高度,避免首次定位偏移
+        card.Measure(new Size(window.Width, double.PositiveInfinity));
+        double h = card.DesiredSize.Height > 0 ? card.DesiredSize.Height : 340;
+
         var wa = SystemParameters.WorkArea;
-        double h = window.ActualHeight > 0 ? window.ActualHeight : 340;
         window.Left = wa.Right - window.Width - 8;
         window.Top = wa.Bottom - h - 8;
 

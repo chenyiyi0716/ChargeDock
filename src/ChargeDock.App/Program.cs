@@ -159,15 +159,43 @@ public static class Program
 
     // ================= 数据刷新 =================
 
+    static List<BatteryReading>? lastRendered;
+
     static void RefreshAll()
     {
         var readings = readers.Select(r => r.Snapshot()).ToList();
         var visible = DeviceDisplayPolicy.SelectVisible(readings).ToList();
 
-        flyout.Render(visible);
+        // 电量/连接状态没有变化时不重渲染,避免卡片闪烁和重复动画
+        if (lastRendered == null || !SameReadings(lastRendered, visible))
+        {
+            lastRendered = visible;
+            flyout.Render(visible);
+        }
 
         UpdateTray(visible);
         CheckLowBattery(visible);
+    }
+
+    /// <summary>比较两次读数是否一致(只比影响显示的字段;Status/LastSeen 会随时间变化,不参与比较)。</summary>
+    static bool SameReadings(IReadOnlyList<BatteryReading> a, IReadOnlyList<BatteryReading> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+        {
+            var x = a[i];
+            var y = b[i];
+            if (x.Kind != y.Kind
+                || x.DisplayName != y.DisplayName
+                || x.Battery != y.Battery
+                || x.Left != y.Left
+                || x.Right != y.Right
+                || x.Case != y.Case
+                || x.Charging != y.Charging
+                || x.Connected != y.Connected)
+                return false;
+        }
+        return true;
     }
 
     static int MinLevel(BatteryReading r)

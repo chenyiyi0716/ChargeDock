@@ -28,6 +28,7 @@ public sealed class TrayMenu
     TextBlock? showHint;
     ToggleItem? startupToggle;
     bool built;
+    int lastLevel = -1;
 
     public Action? ShowCardRequested;
     public Action? RefreshRequested;
@@ -88,7 +89,7 @@ public sealed class TrayMenu
         card.Background = new SolidColorBrush(Theme.GlassOverlay);
 
         // 显示电量(+ 最低电量提示)
-        showHint = Txt("—", 11, Theme.Muted, false);
+        showHint = Txt(lastLevel < 0 ? "—" : lastLevel + "%", 11, Theme.Muted, false);
         panel.Children.Add(Item("显示电量", "card", showHint, false, OnShowCard));
 
         // 立即刷新
@@ -120,6 +121,7 @@ public sealed class TrayMenu
 
     public void SetBattery(int level)
     {
+        lastLevel = level;
         if (!built) Build();
         if (showHint != null) showHint.Text = level < 0 ? "—" : level + "%";
     }
@@ -128,9 +130,12 @@ public sealed class TrayMenu
     {
         Build();
         startupToggle?.Set(Settings.StartupEnabled);
-        window.UpdateLayout();
-        double w = window.ActualWidth > 0 ? window.ActualWidth : MenuWidth + 12;
-        double h = window.ActualHeight > 0 ? window.ActualHeight : 320;
+
+        // 首次显示时窗口尚未布局(ActualWidth/Height 为 0),先测量内容拿到真实尺寸,
+        // 否则会按兜底尺寸定位,导致第一次弹出的位置偏离鼠标。
+        panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        double w = panel.DesiredSize.Width + 12;
+        double h = panel.DesiredSize.Height + 12;
 
         var wa = SystemParameters.WorkArea;
         double left = screenX - w;
