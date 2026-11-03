@@ -71,15 +71,15 @@ public static class Theme
         ? Color.FromRgb(0xEE, 0xF1, 0xF6)
         : Color.FromRgb(0x1A, 0x1D, 0x24);
 
-    /// <summary>次要文字(副标 / 元信息,约 50% 不透明度)。</summary>
+    /// <summary>次要文字(副标 / 元信息)。浅色背景上提高不透明度以保证可读。</summary>
     public static Color Dim => IsDark
-        ? Color.FromArgb(128, 0xEE, 0xF1, 0xF6)
-        : Color.FromArgb(128, 0x1A, 0x1D, 0x24);
+        ? Color.FromArgb(165, 0xEE, 0xF1, 0xF6)
+        : Color.FromArgb(165, 0x1A, 0x1D, 0x24);
 
-    /// <summary>更弱的文字(分组标题,约 45% 不透明度)。</summary>
+    /// <summary>更弱的文字(分组标题 / 状态)。浅色背景上提高不透明度以避免过淡。</summary>
     public static Color Muted => IsDark
-        ? Color.FromArgb(115, 0xEE, 0xF1, 0xF6)
-        : Color.FromArgb(115, 0x1A, 0x1D, 0x24);
+        ? Color.FromArgb(145, 0xEE, 0xF1, 0xF6)
+        : Color.FromArgb(150, 0x1A, 0x1D, 0x24);
 
     // ---- 图标 ----
     public static Color IconBg => IsDark
@@ -103,8 +103,8 @@ public static class Theme
     public static Color ToggleOn => Color.FromRgb(0x63, 0x66, 0xF1);
 
     public static Color ToggleOff => IsDark
-        ? Color.FromArgb(41, 255, 255, 255)
-        : Color.FromArgb(36, 0, 0, 0);
+        ? Color.FromArgb(70, 255, 255, 255)
+        : Color.FromArgb(62, 0, 0, 0);
 
     public static Color SegBg => IsDark
         ? Color.FromArgb(26, 255, 255, 255)

@@ -36,6 +36,7 @@ public sealed class Flyout
     TextBlock statusText = null!;
     Ellipse statusDot = null!;
     Viewbox headerIcon = null!;
+    Border? headerDivider;
     bool showSettings;
 
     // 设备行(持久化,更新时不重建,保证电量条动画)
@@ -74,8 +75,8 @@ public sealed class Flyout
         var root = new StackPanel();
         root.Children.Add(BuildHeader());
 
-        var divider = new Border { Height = 1, Background = new SolidColorBrush(Theme.Divider), Margin = new Thickness(0, 14, 0, 0) };
-        root.Children.Add(divider);
+        headerDivider = new Border { Height = 1, Background = new SolidColorBrush(Theme.Divider), Margin = new Thickness(0, 14, 0, 0) };
+        root.Children.Add(headerDivider);
 
         bodyPanel = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
         root.Children.Add(bodyPanel);
@@ -587,10 +588,15 @@ public sealed class Flyout
         else Show();
     }
 
-    /// <summary>主题切换后重建整卡(保留当前视图),并保留拖拽/动效状态。</summary>
+    /// <summary>主题切换后重建整卡(保留当前视图)。</summary>
     public void ApplyTheme()
     {
         ApplyShellColors();
+        // 头部不是每次重建的,这里同步刷新配色,避免切换主题后标题/状态仍是旧主题颜色
+        titleText.Foreground = new SolidColorBrush(Theme.Fg);
+        statusText.Foreground = new SolidColorBrush(Theme.Muted);
+        statusDot.Fill = new SolidColorBrush(Theme.StatusDot);
+        if (headerDivider != null) headerDivider.Background = new SolidColorBrush(Theme.Divider);
         SetView(showSettings, animate: false);
     }
 
@@ -788,11 +794,13 @@ public sealed class Flyout
                 Height = 18,
                 CornerRadius = new CornerRadius(9),
                 Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                BorderThickness = new Thickness(1),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(2.5, 0, 0, 0),
             };
-            knob.Effect = new DropShadowEffect { BlurRadius = 3, ShadowDepth = 1, Opacity = 0.25 };
+            knob.Effect = new DropShadowEffect { BlurRadius = 4, ShadowDepth = 1, Opacity = 0.35 };
             knobShift = new TranslateTransform(initial ? 17 : 0, 0);
             knob.RenderTransform = knobShift;
             Root.Child = knob;
