@@ -22,6 +22,9 @@ if (-not $SkipTests) {
 & $dotnet publish $app -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $publishDir -nologo
 if ($LASTEXITCODE -ne 0) { throw "app publish failed" }
 
+# 1.1) 给主程序签名(先签后嵌入,安装后解出来的主程序也是已签名的)
+& (Join-Path $PSScriptRoot 'sign.ps1') -Files @((Join-Path $publishDir 'ChargeDock.exe'))
+
 # 2) 复制进 installer payload
 New-Item -ItemType Directory -Path $payloadDir -Force | Out-Null
 Copy-Item (Join-Path $publishDir 'ChargeDock.exe') (Join-Path $payloadDir 'ChargeDock.exe') -Force
@@ -31,6 +34,9 @@ Copy-Item (Join-Path $publishDir 'ChargeDock.exe') (Join-Path $payloadDir 'Charg
 #    但代码逻辑已通过 `dotnet ChargeDock-Setup.dll` 验证,用户正常双击不受影响。
 & $dotnet publish $installer -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $outDir -nologo
 if ($LASTEXITCODE -ne 0) { throw "installer publish failed" }
+
+# 3.1) 给安装包签名
+& (Join-Path $PSScriptRoot 'sign.ps1') -Files @((Join-Path $outDir 'ChargeDock-Setup.exe'))
 
 Write-Host ""
 Write-Host "产出:" -ForegroundColor Green

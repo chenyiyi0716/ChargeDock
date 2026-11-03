@@ -6,14 +6,14 @@
 
 ## 技术栈
 
-| 层 | 选型 | 说明 |
-| --- | --- | --- |
-| 语言 / 运行时 | C# · **.NET 8 LTS** | 按技术方案升级到 .NET 8 |
-| UI 框架 | **WPF**(.NET 8) | 技术方案优先 WinUI 3,但按文档预留的"兜底"落到 WPF,见下方说明 |
-| 设备访问 | 独立 `ChargeDock.Devices` 类库 | BLE 走 `Windows.Devices.Bluetooth`;HID 走 SetupAPI P/Invoke |
-| 托盘图标 | WinForms `NotifyIcon` 互操作 | WPF 无原生托盘 |
-| 部署 | 非打包 + 自包含,单文件安装 EXE | 开机自启写 HKCU Run 键 |
-| 测试 | **xUnit** | 业务逻辑(低电量、显示规则)脱离真机单测 |
+| 层        | 选型                         | 说明                                                        |
+| -------- | -------------------------- | --------------------------------------------------------- |
+| 语言 / 运行时 | C# · **.NET 8 LTS**        | 按技术方案升级到 .NET 8                                           |
+| UI 框架    | **WPF**(.NET 8)            | 技术方案优先 WinUI 3,但按文档预留的"兜底"落到 WPF,见下方说明                    |
+| 设备访问     | 独立 `ChargeDock.Devices` 类库 | BLE 走 `Windows.Devices.Bluetooth`;HID 走 SetupAPI P/Invoke |
+| 托盘图标     | WinForms `NotifyIcon` 互操作  | WPF 无原生托盘                                                 |
+| 部署       | 非打包 + 自包含,单文件安装 EXE        | 开机自启写 HKCU Run 键                                          |
+| 测试       | **xUnit**                  | 业务逻辑(低电量、显示规则)脱离真机单测                                      |
 
 ### 为什么 UI 用了 WPF 而不是 WinUI 3
 
@@ -46,12 +46,12 @@ tests/
 
 ## 支持设备
 
-| 设备 | 显示 | 状态 |
-| --- | --- | --- |
-| 鼠标 HECATE G3M Pro | 1 个电量 | ✅ 2.4G 接收器私有 HID(已逆向,主动查询 + 校验帧) |
-| 耳机 REDMI Buds 8 Pro | 左 / 右(独立) | ✅ BLE GATT 0x180F / 0x2A19 |
-| 耳机充电仓 | — | ⏳ 尚未逆向通道,读不到就不显示("能读到则显示") |
-| 键盘 K820 | — | ❌ 固件不上报电量,按技术方案"先搁置" |
+| 设备                  | 显示        | 状态                               |
+| ------------------- | --------- | -------------------------------- |
+| 鼠标 HECATE G3M Pro   | 1 个电量     | ✅ 2.4G 接收器私有 HID(已逆向,主动查询 + 校验帧) |
+| 耳机 REDMI Buds 8 Pro | 左 / 右(独立) | ✅ BLE GATT 0x180F / 0x2A19       |
+| 耳机充电仓               | —         | ⏳ 尚未逆向通道,读不到就不显示("能读到则显示")       |
+| 键盘 K820             | —         | ❌ 固件不上报电量,按技术方案"先搁置"             |
 
 逆向成果(鼠标查询帧校验、BLE 双地址)从 `BatteryWatchDemo/` 原样迁移,逻辑未变。
 
@@ -70,6 +70,8 @@ tests/
 .\build\publish.ps1        # 发布自包含主程序 + 打包单文件安装器
 .\build\verify-install.ps1 # 端到端验证安装/卸载逻辑
 ```
+
+> **代码签名**:`publish.ps1` 会自动调用 `build\sign.ps1`,用本机自签证书(CN=ChargeDock)给主程序和安装包做 SHA256 Authenticode 签名,并把证书加进本机「受信任的根 + 受信任发布者」,消除"未知发布者"提示。签名状态可用 `Get-AuthenticodeSignature <exe>` 查看。
 
 产物:
 
