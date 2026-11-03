@@ -23,6 +23,12 @@ static class GlassEffect
     [DllImport("dwmapi.dll")]
     static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct Margins { public int Left; public int Right; public int Top; public int Bottom; }
+
+    [DllImport("dwmapi.dll")]
+    static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
+
     const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
     const int DWMWCP_ROUND = 2;
     const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
@@ -101,6 +107,9 @@ static class GlassEffect
         if (hwnd == IntPtr.Zero) return false;
         try
         {
+            // 让 Acrylic 铺满整个客户区(否则无边框窗口的客户区是黑的)
+            var margins = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
+            DwmExtendFrameIntoClientArea(hwnd, ref margins);
             int darkMode = dark ? 1 : 0;
             DwmSetWindowAttribute(hwnd, 20, ref darkMode, sizeof(int)); // DWMWA_USE_IMMERSIVE_DARK_MODE
             int type = DWMSBT_TRANSIENTWINDOW;

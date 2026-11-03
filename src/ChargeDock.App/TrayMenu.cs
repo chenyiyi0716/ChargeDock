@@ -43,18 +43,27 @@ public sealed class TrayMenu
         {
             WindowStyle = WindowStyle.None,
             AllowsTransparency = false,
-            Background = new SolidColorBrush(Theme.SolidCardBg),
+            Background = Brushes.Transparent,
             ShowInTaskbar = false,
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
             SizeToContent = SizeToContent.WidthAndHeight,
         };
 
+        System.Windows.Shell.WindowChrome.SetWindowChrome(window, new System.Windows.Shell.WindowChrome
+        {
+            GlassFrameThickness = new Thickness(-1),
+            CornerRadius = new CornerRadius(0),
+            CaptionHeight = 0,
+            ResizeBorderThickness = new Thickness(0),
+            UseAeroCaptionButtons = false,
+        });
+
         card = new Border
         {
-            CornerRadius = new CornerRadius(Radius),
+            CornerRadius = new CornerRadius(8),
             Padding = new Thickness(6),
-            Background = Brushes.Transparent,
+            Background = new SolidColorBrush(Theme.GlassOverlay),
         };
         panel = new StackPanel { Width = MenuWidth };
         card.Child = panel;
@@ -69,14 +78,14 @@ public sealed class TrayMenu
     {
         var hwnd = new WindowInteropHelper(window).Handle;
         if (hwnd == IntPtr.Zero) return;
-        GlassEffect.ApplyAcrylic(hwnd, Theme.AcrylicTint);
-        if (window.ActualWidth > 0 && window.ActualHeight > 0)
-            GlassEffect.ApplyRoundedRegion(hwnd, (int)window.ActualWidth, (int)window.ActualHeight, (int)Radius);
+        GlassEffect.ApplySystemAcrylic(hwnd, Theme.IsDark);
+        GlassEffect.ApplyNativeRoundedCorners(hwnd);
     }
 
     void Build()
     {
         panel.Children.Clear();
+        card.Background = new SolidColorBrush(Theme.GlassOverlay);
 
         // 显示电量(+ 最低电量提示)
         showHint = Txt("—", 11, Theme.Muted, false);
