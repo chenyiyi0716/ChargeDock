@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChargeDock · 托盘图标方案</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Segoe UI Variable Display","Segoe UI",-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(180deg,#f4f5f7,#e8ebef);color:#1a1d24;padding:56px 24px 96px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:760px;margin:0 auto}
+  .page-head{margin-bottom:32px}
+  .page-head h1{font-size:28px;font-weight:650;letter-spacing:-.02em}
+  .page-head p{margin-top:8px;color:#6b7280;font-size:14px;line-height:1.6}
+
+  .opt{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;padding:22px 24px;margin-bottom:22px;box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
+  .opt-head{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+  .opt-head .no{font-size:12px;font-weight:700;color:#8b5cf6;letter-spacing:.06em}
+  .opt-head h3{font-size:17px;font-weight:650}
+  .opt-head p{color:#6b7280;font-size:13px;margin-top:4px;line-height:1.6}
+
+  .row{display:flex;gap:30px;align-items:center;margin-top:14px;padding:14px 18px;border-radius:12px}
+  .row.light{background:#f2f5f8}
+  .row.dark{background:#14161d}
+  .row.task{background:linear-gradient(180deg,#232a36,#161b25)}
+  .row-label{font-size:11px;color:#8a919e;width:70px;flex:none;letter-spacing:.04em}
+  .row.dark .row-label,.row.task .row-label{color:#6b7484}
+
+  .cell{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .cell .pct{font-size:10.5px;color:#98a0ab}
+  .row.dark .cell .pct,.row.task .cell .pct{color:#6b7484}
+  .ico32{width:32px;height:32px;display:block}
+  .ico16{width:16px;height:16px;display:block}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-head">
+    <h1>ChargeDock · 托盘图标方案</h1>
+    <p>4 套图标方向，均可切换（设置页 → 外观 → 托盘图标）。每套展示 高(82%) / 中(40%) / 低(12%) 三档，以及浅色、深色、真实托盘 16px 三种场景。图标随电量变色（绿 / 黄 / 红）。</p>
+  </div>
+
+  <!-- SVG symbols -->
+  <svg style="display:none">
+    <defs>
+      <!-- 1. vertical battery -->
+      <symbol id="vb-hi" viewBox="0 0 24 24">
+        <rect x="7.5" y="4.5" width="9" height="15" rx="2.5" fill="none" stroke="#22c55e" stroke-width="1.7"/>
+        <rect x="10" y="2" width="4" height="2.4" rx="1.2" fill="#22c55e"/>
+        <rect x="9.2" y="8.4" width="5.6" height="9.3" rx="1" fill="#22c55e"/>
+      </symbol>
+      <symbol id="vb-mid" viewBox="0 0 24 24">
+        <rect x="7.5" y="4.5" width="9" height="15" rx="2.5" fill="none" stroke="#f59e0b" stroke-width="1.7"/>
+        <rect x="10" y="2" width="4" height="2.4" rx="1.2" fill="#f59e0b"/>
+        <rect x="9.2" y="13.1" width="5.6" height="4.6" rx="1" fill="#f59e0b"/>
+      </symbol>
+      <symbol id="vb-lo" viewBox="0 0 24 24">
+        <rect x="7.5" y="4.5" width="9" height="15" rx="2.5" fill="none" stroke="#ef4444" stroke-width="1.7"/>
+        <rect x="10" y="2" width="4" height="2.4" rx="1.2" fill="#ef4444"/>
+        <rect x="9.2" y="16.3" width="5.6" height="1.4" rx="0.7" fill="#ef4444"/>
+      </symbol>
+
+      <!-- 2. horizontal capsule -->
+      <symbol id="hb-hi" viewBox="0 0 24 24">
+        <rect x="2" y="9" width="16.4" height="6" rx="3" fill="none" stroke="#22c55e" stroke-width="1.7"/>
+        <rect x="18.4" y="10.7" width="2.6" height="2.6" rx="1.3" fill="#22c55e"/>
+        <rect x="3.7" y="10.7" width="10.8" height="2.6" rx="1.3" fill="#22c55e"/>
+      </symbol>
+      <symbol id="hb-mid" viewBox="0 0 24 24">
+        <rect x="2" y="9" width="16.4" height="6" rx="3" fill="none" stroke="#f59e0b" stroke-width="1.7"/>
+        <rect x="18.4" y="10.7" width="2.6" height="2.6" rx="1.3" fill="#f59e0b"/>
+        <rect x="3.7" y="10.7" width="5.3" height="2.6" rx="1.3" fill="#f59e0b"/>
+      </symbol>
+      <symbol id="hb-lo" viewBox="0 0 24 24">
+        <rect x="2" y="9" width="16.4" height="6" rx="3" fill="none" stroke="#ef4444" stroke-width="1.7"/>
+        <rect x="18.4" y="10.7" width="2.6" height="2.6" rx="1.3" fill="#ef4444"/>
+        <rect x="3.7" y="10.7" width="1.6" height="2.6" rx="0.8" fill="#ef4444"/>
+      </symbol>
+
+      <!-- 3. ring gauge -->
+      <symbol id="rg-hi" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#c3cad4" stroke-width="3"/>
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round" stroke-dasharray="43.8 53.41" transform="rotate(-90 12 12)"/>
+      </symbol>
+      <symbol id="rg-mid" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#c3cad4" stroke-width="3"/>
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#f59e0b" stroke-width="3" stroke-linecap="round" stroke-dasharray="21.4 53.41" transform="rotate(-90 12 12)"/>
+      </symbol>
+      <symbol id="rg-lo" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#c3cad4" stroke-width="3"/>
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="#ef4444" stroke-width="3" stroke-linecap="round" stroke-dasharray="6.4 53.41" transform="rotate(-90 12 12)"/>
+      </symbol>
+
+      <!-- 4. number badge -->
+      <symbol id="bd-hi" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="5" fill="#22c55e" opacity=".16"/>
+        <rect x="3" y="4" width="18" height="16" rx="5" fill="none" stroke="#22c55e" stroke-width="1.7"/>
+        <text x="12" y="16.4" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="10.5" font-weight="700" fill="#22c55e">82</text>
+      </symbol>
+      <symbol id="bd-mid" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="5" fill="#f59e0b" opacity=".16"/>
+        <rect x="3" y="4" width="18" height="16" rx="5" fill="none" stroke="#f59e0b" stroke-width="1.7"/>
+        <text x="12" y="16.4" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="10.5" font-weight="700" fill="#f59e0b">40</text>
+      </symbol>
+      <symbol id="bd-lo" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="5" fill="#ef4444" opacity=".16"/>
+        <rect x="3" y="4" width="18" height="16" rx="5" fill="none" stroke="#ef4444" stroke-width="1.7"/>
+        <text x="12" y="16.4" text-anchor="middle" font-family="Segoe UI, sans-serif" font-size="10.5" font-weight="700" fill="#ef4444">12</text>
+      </symbol>
+    </defs>
+  </svg>
+
+  <!-- ============ Option 1 ============ -->
+  <div class="opt">
+    <div class="opt-head">
+      <span class="no">01</span>
+      <div>
+        <h3>竖版电池</h3>
+        <p>经典电池外形，内部填充表示电量，顶部带正极凸起。最直观，一眼即懂。</p>
+      </div>
+    </div>
+    <div class="row light"><span class="row-label">浅色</span>
+      <div class="cell"><svg class="ico32"><use href="#vb-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#vb-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#vb-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row dark"><span class="row-label">深色</span>
+      <div class="cell"><svg class="ico32"><use href="#vb-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#vb-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#vb-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row task"><span class="row-label">16px 实际</span>
+      <div class="cell"><svg class="ico16"><use href="#vb-hi"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#vb-mid"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#vb-lo"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ============ Option 2 ============ -->
+  <div class="opt">
+    <div class="opt-head">
+      <span class="no">02</span>
+      <div>
+        <h3>横版胶囊电池</h3>
+        <p>横向胶囊 + 右侧正极端子，填充比例即电量。横向视觉重心更低，适合任务栏。</p>
+      </div>
+    </div>
+    <div class="row light"><span class="row-label">浅色</span>
+      <div class="cell"><svg class="ico32"><use href="#hb-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#hb-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#hb-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row dark"><span class="row-label">深色</span>
+      <div class="cell"><svg class="ico32"><use href="#hb-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#hb-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#hb-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row task"><span class="row-label">16px 实际</span>
+      <div class="cell"><svg class="ico16"><use href="#hb-hi"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#hb-mid"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#hb-lo"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ============ Option 3 ============ -->
+  <div class="opt">
+    <div class="opt-head">
+      <span class="no">03</span>
+      <div>
+        <h3>圆环仪表</h3>
+        <p>环形进度，弧长即电量，圆润现代，偏「仪表盘」气质，与玻璃拟态卡片呼应。</p>
+      </div>
+    </div>
+    <div class="row light"><span class="row-label">浅色</span>
+      <div class="cell"><svg class="ico32"><use href="#rg-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#rg-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#rg-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row dark"><span class="row-label">深色</span>
+      <div class="cell"><svg class="ico32"><use href="#rg-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#rg-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#rg-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row task"><span class="row-label">16px 实际</span>
+      <div class="cell"><svg class="ico16"><use href="#rg-hi"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#rg-mid"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#rg-lo"/></svg></div>
+    </div>
+  </div>
+
+  <!-- ============ Option 4 ============ -->
+  <div class="opt">
+    <div class="opt-head">
+      <span class="no">04</span>
+      <div>
+        <h3>数字徽章</h3>
+        <p>圆角徽章内显示当前最低电量百分比，信息最直接；颜色随电量变化。</p>
+      </div>
+    </div>
+    <div class="row light"><span class="row-label">浅色</span>
+      <div class="cell"><svg class="ico32"><use href="#bd-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#bd-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#bd-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row dark"><span class="row-label">深色</span>
+      <div class="cell"><svg class="ico32"><use href="#bd-hi"/></svg><span class="pct">82%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#bd-mid"/></svg><span class="pct">40%</span></div>
+      <div class="cell"><svg class="ico32"><use href="#bd-lo"/></svg><span class="pct">12%</span></div>
+    </div>
+    <div class="row task"><span class="row-label">16px 实际</span>
+      <div class="cell"><svg class="ico16"><use href="#bd-hi"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#bd-mid"/></svg></div>
+      <div class="cell"><svg class="ico16"><use href="#bd-lo"/></svg></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
