@@ -382,7 +382,7 @@ public static class Program
         encoder.Save(fs);
     }
 
-    static void Log(string msg)
+    internal static void Log(string msg)
     {
         try
         {

@@ -41,10 +41,10 @@ public static class Theme
     public static bool SystemIsDark => SystemUsesDarkTheme();
 
     // ---- 玻璃卡片 ----
-    /// <summary>卡片背景(半透明毛玻璃底色)。</summary>
+    /// <summary>卡片背景(分层窗口下的半透明玻璃底色,alpha 越高越不透明)。</summary>
     public static Color CardBg => IsDark
-        ? Color.FromArgb(158, 18, 20, 28)
-        : Color.FromArgb(158, 255, 255, 255);
+        ? Color.FromArgb(0xE8, 0x12, 0x14, 0x1C)
+        : Color.FromArgb(0xE8, 0xFF, 0xFF, 0xFF);
 
     /// <summary>非分层窗口的实色背景(亚克力不可用时的兜底)。</summary>
     public static Color SolidCardBg => IsDark

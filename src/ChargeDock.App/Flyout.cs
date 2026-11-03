@@ -55,12 +55,13 @@ public sealed class Flyout
 
     public Flyout()
     {
-        // 亚克力毛玻璃需要非分层窗口(AllowsTransparency=false),圆角交给 SetWindowRgn 实现
+        // 分层窗口:卡片圆角由 Border 的 CornerRadius 决定。
+        // 非分层窗口用 SetWindowRgn 裁圆角时,裁不住 DWM 合成的亚克力层,角落会露出方形。
         window = new Window
         {
             WindowStyle = WindowStyle.None,
-            AllowsTransparency = false,
-            Background = new SolidColorBrush(Theme.SolidCardBg),
+            AllowsTransparency = true,
+            Background = Brushes.Transparent,
             ShowInTaskbar = false,
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
@@ -72,7 +73,10 @@ public sealed class Flyout
         {
             CornerRadius = new CornerRadius(22),
             Padding = new Thickness(20),
-            Background = Brushes.Transparent,
+            Background = new SolidColorBrush(Theme.CardBg),
+            BorderBrush = new SolidColorBrush(Theme.CardBorder),
+            BorderThickness = new Thickness(1),
+            Effect = new DropShadowEffect { BlurRadius = 28, ShadowDepth = 0, Opacity = 0.32, Color = Colors.Black },
         };
 
         root = new StackPanel();
@@ -90,10 +94,8 @@ public sealed class Flyout
         ApplyShellColors();
         SetView(false, animate: false);
 
-        window.SourceInitialized += (_, _) => { ApplyAcrylic(); ApplyRegion(); };
         window.SizeChanged += (_, e) =>
         {
-            ApplyRegion();
             // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
             window.Left = wa.Right - window.Width - 8;
@@ -101,26 +103,11 @@ public sealed class Flyout
         };
     }
 
-    void ApplyAcrylic()
-    {
-        var hwnd = new WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero) return;
-        GlassEffect.ApplyAcrylic(hwnd, Theme.AcrylicTint);
-    }
-
-    void ApplyRegion()
-    {
-        var hwnd = new WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero) return;
-        int w = (int)window.ActualWidth;
-        int h = (int)window.ActualHeight;
-        if (w > 0 && h > 0) GlassEffect.ApplyRoundedRegion(hwnd, w, h, 22);
-    }
-
     void ApplyShellColors()
     {
-        window.Background = new SolidColorBrush(Theme.SolidCardBg);
-        if (window.IsVisible) ApplyAcrylic();
+        if (card == null) return;
+        card.Background = new SolidColorBrush(Theme.CardBg);
+        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
     }
 
     /// <summary>--render 用:亚克力只在真实窗口生效,渲染时给卡片一个可见底色。</summary>
@@ -778,36 +765,43 @@ public sealed class Flyout
         public TextBlock Pct = null!;
     }
 
-    /// <summary>圆角进度条:ScaleX 平滑过渡。</summary>
+    /// <summary>圆角进度条:用 Width 动画(ScaleX 会把填充圆角压成尖角)。</summary>
     sealed class Bar
     {
         public Grid Root;
         public Border Fill = null!;
-        readonly ScaleTransform scale;
+        int level;
 
         public Bar()
         {
             Root = new Grid { Height = 7 };
-            var track = new Border { CornerRadius = new CornerRadius(99), Background = new SolidColorBrush(Theme.BarTrack) };
+            var track = new Border { CornerRadius = new CornerRadius(3.5), Background = new SolidColorBrush(Theme.BarTrack) };
             Root.Children.Add(track);
             Fill = new Border
             {
-                CornerRadius = new CornerRadius(99),
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                RenderTransformOrigin = new Point(0, 0.5),
+                CornerRadius = new CornerRadius(3.5),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Width = 0,
             };
-            scale = new ScaleTransform(0, 1);
-            Fill.RenderTransform = scale;
             Root.Children.Add(Fill);
+            Root.SizeChanged += (_, _) => ApplyWidth(false);
         }
 
         public void Set(int level)
         {
+            this.level = level;
             Fill.Background = Theme.LevelBarBrush(level);
-            double to = Math.Max(0, Math.Min(100, level)) / 100.0;
-            if (!AnimationsEnabled) { scale.ScaleX = to; return; }
-            var anim = new DoubleAnimation(scale.ScaleX, to, TimeSpan.FromMilliseconds(320)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+            ApplyWidth(AnimationsEnabled);
+        }
+
+        void ApplyWidth(bool animate)
+        {
+            if (Root.ActualWidth <= 0) return;
+            double target = Math.Max(0, Math.Min(100, level)) / 100.0 * Root.ActualWidth;
+            Fill.BeginAnimation(FrameworkElement.WidthProperty, null);
+            if (!animate) { Fill.Width = target; return; }
+            var anim = new DoubleAnimation(Fill.Width, target, TimeSpan.FromMilliseconds(320)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+            Fill.BeginAnimation(FrameworkElement.WidthProperty, anim);
         }
     }
 
@@ -829,7 +823,7 @@ public sealed class Flyout
             {
                 Width = 40,
                 Height = 23,
-                CornerRadius = new CornerRadius(99),
+                CornerRadius = new CornerRadius(11.5),
                 Cursor = Cursors.Hand,
                 Background = new SolidColorBrush(initial ? Theme.ToggleOn : Theme.ToggleOff),
             };

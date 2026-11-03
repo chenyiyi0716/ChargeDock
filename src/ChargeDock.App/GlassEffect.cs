@@ -20,6 +20,12 @@ static class GlassEffect
     [DllImport("user32.dll")]
     static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
 
+    [DllImport("dwmapi.dll")]
+    static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    const int DWMWCP_ROUND = 2;
+
     [StructLayout(LayoutKind.Sequential)]
     struct AccentPolicy
     {
@@ -65,6 +71,21 @@ static class GlassEffect
             {
                 Marshal.FreeHGlobal(ptr);
             }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Windows 11 原生圆角:DWM 会把亚克力层也裁成圆角(SetWindowRgn 只裁 WPF 内容,裁不住 DWM 合成的亚克力)。</summary>
+    public static bool ApplyNativeRoundedCorners(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+        try
+        {
+            int pref = DWMWCP_ROUND;
+            return DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int)) == 0;
         }
         catch
         {
