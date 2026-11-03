@@ -135,6 +135,38 @@
   .stepper span{min-width:44px;text-align:center;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}
 
   .hint{font-size:12.5px;color:#6b7280;line-height:1.7}
+
+  /* ===== 托盘图标（环形仪表） ===== */
+  .light-stage{--ring-track:#dde1e6;--ring-arc:#22c55e}
+  .dark-stage{--ring-track:#2f353d;--ring-arc:#4ade80}
+  .tray-row{display:flex;gap:34px;align-items:flex-end}
+  .tray-item{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .tray-item .sz{font-size:10.5px;color:#8a919e}
+  .dark-stage .tray-item .sz{color:#6b7484}
+
+  /* ===== 托盘右键菜单 ===== */
+  .tm{width:250px;border-radius:16px;padding:6px;
+    background:rgba(255,255,255,.76);
+    backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%);
+    border:1px solid rgba(255,255,255,.85);
+    box-shadow:0 22px 48px -18px rgba(15,23,42,.42);}
+  .dark-stage .tm{background:rgba(22,25,24,.82);border:1px solid rgba(255,255,255,.09);color:#ececec;box-shadow:0 22px 48px -18px rgba(0,0,0,.75)}
+  .tm-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:9px;font-size:13px;cursor:default}
+  .tm-item:hover{background:rgba(0,0,0,.06)}
+  .dark-stage .tm-item:hover{background:rgba(255,255,255,.08)}
+  .tm-item .ic{width:16px;height:16px;flex:none;opacity:.7;display:grid;place-items:center}
+  .tm-item .ic svg{width:16px;height:16px}
+  .tm-item .lb{flex:1;white-space:nowrap}
+  .tm-item .tm-hint{font-size:11px;opacity:.45}
+  .tm-sep{height:1px;background:rgba(0,0,0,.07);margin:4px 10px}
+  .dark-stage .tm-sep{background:rgba(255,255,255,.08)}
+  .tm-item.danger{color:#dc2626}
+  .dark-stage .tm-item.danger{color:#ff6b6b}
+  .tm-sw{width:34px;height:20px;border-radius:99px;background:rgba(0,0,0,.16);position:relative;flex:none}
+  .dark-stage .tm-sw{background:rgba(255,255,255,.18)}
+  .tm-sw.on{background:#2E5D4E}
+  .tm-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .tm-sw.on::after{left:16px}
 </style>
 </head>
 <body>
@@ -142,7 +174,7 @@
 
   <div class="page-head">
     <h1>ChargeDock · UI 定稿</h1>
-    <p>方向：玻璃拟态（A）。已去掉标题左侧图标、修正鼠标图标比例，并新增设置页（点击卡片右上角齿轮进入）。<br>演示数据：鼠标 82% · 键盘 12%（低电量）· 耳机 左45% / 右70% / 充电仓100%。</p>
+    <p>方向：玻璃拟态（A）。本页整合全部定稿 UI：主卡片、设置页、托盘图标（环形仪表）与托盘右键菜单（图标分组式）。<br>演示数据：鼠标 82% · 键盘 12%（低电量）· 耳机 左45% / 右70% / 充电仓100%。</p>
   </div>
 
   <!-- ============ LIGHT ============ -->
@@ -293,7 +325,119 @@
     </div>
   </div>
 
-  <p class="hint">说明：标题左侧图标已去除；鼠标图标已重画为正常比例；右上角齿轮为设置入口，设置页覆盖「通用 / 低电量提醒 / 外观 / 关于」四组，组件为玻璃质感的开关、分段选择与步进器。</p>
+  <!-- ============ 托盘图标（环形仪表） ============ -->
+  <h2 style="margin:46px 0 16px;font-size:18px;font-weight:650;letter-spacing:-.01em">托盘图标 · 环形仪表</h2>
+
+  <div class="stage light-stage">
+    <span class="label">Light · 浅色</span>
+    <div class="tray-row">
+      <div class="tray-item">
+        <svg width="48" height="48" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-track)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-arc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="216 264" transform="rotate(-90 50 50)"/></svg>
+        <span class="sz">48px</span>
+      </div>
+      <div class="tray-item">
+        <svg width="32" height="32" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-track)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-arc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="216 264" transform="rotate(-90 50 50)"/></svg>
+        <span class="sz">32px</span>
+      </div>
+      <div class="tray-item">
+        <svg width="16" height="16" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-track)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-arc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="216 264" transform="rotate(-90 50 50)"/></svg>
+        <span class="sz">16px</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage dark-stage">
+    <span class="label">Dark · 深色</span>
+    <div class="tray-row">
+      <div class="tray-item">
+        <svg width="48" height="48" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-track)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-arc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="216 264" transform="rotate(-90 50 50)"/></svg>
+        <span class="sz">48px</span>
+      </div>
+      <div class="tray-item">
+        <svg width="32" height="32" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-track)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-arc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="216 264" transform="rotate(-90 50 50)"/></svg>
+        <span class="sz">32px</span>
+      </div>
+      <div class="tray-item">
+        <svg width="16" height="16" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-track)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="var(--ring-arc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="216 264" transform="rotate(-90 50 50)"/></svg>
+        <span class="sz">16px</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 托盘右键菜单 ============ -->
+  <h2 style="margin:46px 0 16px;font-size:18px;font-weight:650;letter-spacing:-.01em">托盘右键菜单</h2>
+
+  <div class="stage light-stage">
+    <span class="label">Light · 浅色</span>
+    <div class="tm">
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="15" rx="2.5"/><path d="M3 9h18"/><path d="M7 12.5h6"/></svg></span>
+        <span class="lb">显示电量</span>
+        <span class="tm-hint">12%</span>
+      </div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></span>
+        <span class="lb">立即刷新</span>
+      </div>
+      <div class="tm-sep"></div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg></span>
+        <span class="lb">设置…</span>
+      </div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v8"/><path d="M6.5 6.4a8 8 0 1 0 11 0"/></svg></span>
+        <span class="lb">开机自启</span>
+        <span class="tm-sw on"></span>
+      </div>
+      <div class="tm-sep"></div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/></svg></span>
+        <span class="lb">关于 ChargeDock</span>
+        <span class="tm-hint">v0.1.0</span>
+      </div>
+      <div class="tm-item danger">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>
+        <span class="lb">退出</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stage dark-stage">
+    <span class="label">Dark · 深色</span>
+    <div class="tm">
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="15" rx="2.5"/><path d="M3 9h18"/><path d="M7 12.5h6"/></svg></span>
+        <span class="lb">显示电量</span>
+        <span class="tm-hint">12%</span>
+      </div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></span>
+        <span class="lb">立即刷新</span>
+      </div>
+      <div class="tm-sep"></div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4l1.4-1.4M18 6l1.4-1.4"/></svg></span>
+        <span class="lb">设置…</span>
+      </div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v8"/><path d="M6.5 6.4a8 8 0 1 0 11 0"/></svg></span>
+        <span class="lb">开机自启</span>
+        <span class="tm-sw on"></span>
+      </div>
+      <div class="tm-sep"></div>
+      <div class="tm-item">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><circle cx="12" cy="7.6" r=".6" fill="currentColor"/></svg></span>
+        <span class="lb">关于 ChargeDock</span>
+        <span class="tm-hint">v0.1.0</span>
+      </div>
+      <div class="tm-item danger">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg></span>
+        <span class="lb">退出</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="hint">说明：本页整合全部定稿 UI —— 主卡片、设置页、托盘图标（环形仪表 16/32/48px）与托盘右键菜单（图标分组式，无状态头）。主卡片标题无图标、齿轮进入设置；设置页含通用 / 低电量提醒 / 外观 / 关于。</p>
 
 </div>
 </body>
