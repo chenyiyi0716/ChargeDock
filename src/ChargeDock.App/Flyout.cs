@@ -589,52 +589,49 @@ public sealed class Flyout
         var wa = SystemParameters.WorkArea;
         double finalTop = wa.Bottom - h - 8;
         window.Left = wa.Right - window.Width - 8;
+        window.Top = finalTop;
         window.Opacity = 1;
-
-        if (!AnimationsEnabled)
-        {
-            window.Top = finalTop;
-            window.Show();
-            window.Activate();
-            return;
-        }
-
-        // 从工作区底边滑入(只做位移,不加透明度过渡)
-        double startTop = finalTop + 8;
-        window.Top = startTop;
         window.Show();
         window.Activate();
 
-        var slide = new DoubleAnimation(startTop, finalTop, TimeSpan.FromMilliseconds(300))
+        // 从工作区底边滑入:只位移卡片内容(GPU 合成,丝滑);不动窗口 Top(SetWindowPos 逐帧重定位会卡顿)
+        if (card.RenderTransform is not TranslateTransform shift)
+        {
+            shift = new TranslateTransform(0, 0);
+            card.RenderTransform = shift;
+        }
+
+        if (!AnimationsEnabled)
+        {
+            shift.Y = 0;
+            return;
+        }
+
+        shift.Y = 8;
+        var slide = new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(280))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
         };
-        slide.Completed += (_, _) =>
-        {
-            window.BeginAnimation(Window.TopProperty, null);
-            window.Top = finalTop;
-        };
-        window.BeginAnimation(Window.TopProperty, slide);
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
     public void Hide()
     {
         if (!window.IsVisible) return;
 
-        if (!AnimationsEnabled)
+        if (!AnimationsEnabled || card.RenderTransform is not TranslateTransform shift)
         {
             window.Hide();
             return;
         }
 
-        // 从工作区底边滑出(只做位移,不加透明度过渡)
-        double from = window.Top;
-        var slide = new DoubleAnimation(from, from + 8, TimeSpan.FromMilliseconds(220))
+        // 向工作区底边滑出(只位移内容,不动窗口)
+        var slide = new DoubleAnimation(shift.Y, 8, TimeSpan.FromMilliseconds(200))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
         };
         slide.Completed += (_, _) => window.Hide();
-        window.BeginAnimation(Window.TopProperty, slide);
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
     public void Toggle()
