@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using ChargeDock.Core;
@@ -333,7 +334,12 @@ public sealed class TrayMenu
             {
                 on = !on;
                 Root.Background = new SolidColorBrush(on ? Theme.ToggleOn : Theme.ToggleOff);
-                shift.X = on ? KnobTravel : 0;
+                double to = on ? KnobTravel : 0;
+                var anim = new DoubleAnimation(shift.X, to, TimeSpan.FromMilliseconds(180))
+                {
+                    EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                };
+                shift.BeginAnimation(TranslateTransform.XProperty, anim);
                 onChanged(on);
             };
         }
@@ -342,7 +348,8 @@ public sealed class TrayMenu
         {
             on = value;
             Root.Background = new SolidColorBrush(on ? Theme.ToggleOn : Theme.ToggleOff);
-            shift.X = on ? KnobTravel : 0;
+            shift.BeginAnimation(TranslateTransform.XProperty, null);
+            shift.X = value ? KnobTravel : 0;
         }
     }
 }
