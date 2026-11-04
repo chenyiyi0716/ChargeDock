@@ -87,7 +87,7 @@ public static class Program
         trayMenu = new TrayMenu();
         trayMenu.ShowCardRequested += () => { RefreshAll(); flyout.ShowIfHidden(); };
         trayMenu.RefreshRequested += OnManualRefresh;
-        trayMenu.SettingsRequested += () => { RefreshAll(); flyout.Show(); flyout.ShowSettings(); };
+        trayMenu.SettingsRequested += () => { RefreshAll(); flyout.SetView(true); flyout.Show(); };
         trayMenu.AboutRequested += ShowAbout;
         trayMenu.ExitRequested += ExitApp;
 

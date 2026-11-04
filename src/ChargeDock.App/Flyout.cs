@@ -38,6 +38,7 @@ public sealed class Flyout
     TextBlock statusText = null!;
     Ellipse statusDot = null!;
     Border gearBtn = null!;
+    Border backBtn = null!;
     Border closeBtn = null!;
     Border? headerDivider;
     bool showSettings;
@@ -279,9 +280,17 @@ public sealed class Flyout
         // 齿轮(打开设置)
         gearBtn = HeaderButton(DrawGear(Theme.IconFg));
         gearBtn.Margin = new Thickness(0, 0, 8, 0);
-        gearBtn.MouseLeftButtonUp += (_, _) => ShowSettings();
+        gearBtn.MouseLeftButtonUp += (_, _) => SetView(true);
         Grid.SetColumn(gearBtn, 2);
         header.Children.Add(gearBtn);
+
+        // 返回按钮(设置视图用,占齿轮的位置)
+        backBtn = HeaderButton(DrawBack(Theme.IconFg));
+        backBtn.Margin = new Thickness(0, 0, 8, 0);
+        backBtn.Visibility = Visibility.Collapsed;
+        backBtn.MouseLeftButtonUp += (_, _) => SetView(false);
+        Grid.SetColumn(backBtn, 2);
+        header.Children.Add(backBtn);
 
         // 关闭(卡片视图 → 收起;设置视图 → 返回卡片)
         closeBtn = HeaderButton(DrawClose(Theme.IconFg));
@@ -334,6 +343,7 @@ public sealed class Flyout
         // 设置视图:隐藏「N 已连接」与齿轮,只留关闭(返回卡片)
         if (statusPanel != null) statusPanel.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
         if (gearBtn != null) gearBtn.Visibility = settings ? Visibility.Collapsed : Visibility.Visible;
+        if (backBtn != null) backBtn.Visibility = settings ? Visibility.Visible : Visibility.Collapsed;
 
         var content = settings ? BuildSettingsView() : BuildDevicesView();
         bodyPanel.Children.Clear();
@@ -344,9 +354,15 @@ public sealed class Flyout
 
         if (animate && AnimationsEnabled)
         {
+            // 页面切换:设置页从右侧滑入,设备页从左侧滑入,配合淡入
+            double offset = settings ? 22 : -22;
+            var tt = new TranslateTransform(offset, 0);
+            content.RenderTransform = tt;
             content.Opacity = 0;
-            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
-            content.BeginAnimation(UIElement.OpacityProperty, fade);
+            var dur = TimeSpan.FromMilliseconds(200);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            content.BeginAnimation(UIElement.OpacityProperty, new DoubleAnimation(0, 1, dur) { EasingFunction = ease });
+            tt.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(offset, 0, dur) { EasingFunction = ease });
         }
     }
 
@@ -860,6 +876,23 @@ public sealed class Flyout
             c.Children.Add(RoundRect(16, 13, 4.5, 7, 2.25, null, stroke, 1.6));
         }
 
+        return c;
+    }
+
+    static Canvas DrawBack(Color color)
+    {
+        var c = new Canvas { Width = 24, Height = 24 };
+        var stroke = new SolidColorBrush(color);
+        var arrow = new Path
+        {
+            Data = Geometry.Parse("M14.5,6 L8.5,12 L14.5,18"),
+            Stroke = stroke,
+            StrokeThickness = 1.9,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round,
+        };
+        c.Children.Add(arrow);
         return c;
     }
 
