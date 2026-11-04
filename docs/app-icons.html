@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>ChargeDock · 应用图标方案</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Segoe UI Variable Display","Segoe UI",-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#e9e6e1;color:#1b1b1b;padding:44px 40px 60px}
+  .page{max-width:1200px;margin:0 auto}
+  h1{font-size:26px;font-weight:650;letter-spacing:-.02em}
+  .sub{margin-top:8px;color:#6b6b6b;font-size:13.5px;line-height:1.6}
+  .row{display:flex;gap:34px;margin-top:28px;flex-wrap:wrap}
+  .card{width:200px;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .icon{width:200px;height:200px;display:block;border-radius:46px;box-shadow:0 16px 36px -18px rgba(0,0,0,.45)}
+  .label{font-size:13px;font-weight:600}
+  .small{display:flex;gap:10px;align-items:center;margin-top:2px}
+  .small svg{display:block;border-radius:12px}
+  .sect{margin-top:34px}
+  .sect-title{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a8278}
+  .band{border-radius:20px;padding:30px 26px;display:flex;gap:34px;flex-wrap:wrap;justify-content:center;border:1px solid rgba(0,0,0,.05)}
+  .band.light{background:#f6f3ee}
+  .band.dark{background:#121417;border-color:#1e2320;color:#e8ece9}
+  .band.dark .label{color:#e8ece9}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>ChargeDock · 应用图标方案</h1>
+  <p class="sub">5 个方向，统一 512×512 圆角磁贴。下面同时展示大图与小尺寸（48 / 32px）检查辨识度；希望你能选中一版，我再出 .ico 多倍率成品。</p>
+
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="gA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1c2733"/><stop offset="1" stop-color="#0b0f15"/></linearGradient>
+      <linearGradient id="aA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4ade80"/><stop offset="1" stop-color="#10b981"/></linearGradient>
+      <linearGradient id="gB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#0e9f6e"/></linearGradient>
+      <linearGradient id="gD" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#115e59"/><stop offset="1" stop-color="#042f2e"/></linearGradient>
+      <linearGradient id="gE" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4f46e5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient>
+
+      <!-- A 环形闪电 -->
+      <symbol id="icA" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="116" fill="url(#gA)"/>
+        <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="3"/>
+        <circle cx="256" cy="256" r="150" fill="none" stroke="#2a3644" stroke-width="32"/>
+        <circle cx="256" cy="256" r="150" fill="none" stroke="url(#aA)" stroke-width="32" stroke-linecap="round" stroke-dasharray="707 942" transform="rotate(-90 256 256)"/>
+        <path d="M290 126 L180 300 H246 L222 386 L330 212 H264 Z" fill="#ffffff"/>
+      </symbol>
+
+      <!-- B 绿色电池 -->
+      <symbol id="icB" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="116" fill="url(#gB)"/>
+        <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="3"/>
+        <rect x="120" y="196" width="232" height="128" rx="38" fill="none" stroke="#ffffff" stroke-width="22"/>
+        <rect x="362" y="232" width="28" height="56" rx="14" fill="#ffffff"/>
+        <rect x="144" y="220" width="180" height="80" rx="24" fill="#ffffff"/>
+      </symbol>
+
+      <!-- C 浅色电池 -->
+      <symbol id="icC" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="116" fill="#f4f7f5"/>
+        <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#dfe6e1" stroke-width="4"/>
+        <rect x="120" y="196" width="232" height="128" rx="38" fill="none" stroke="#1c2733" stroke-width="22"/>
+        <rect x="362" y="232" width="28" height="56" rx="14" fill="#1c2733"/>
+        <rect x="144" y="220" width="146" height="80" rx="24" fill="#10b981"/>
+      </symbol>
+
+      <!-- D 字母 C -->
+      <symbol id="icD" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="116" fill="url(#gD)"/>
+        <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#ffffff" stroke-opacity=".1" stroke-width="3"/>
+        <path d="M359 153 A146 146 0 1 0 359 359" fill="none" stroke="#ffffff" stroke-width="44" stroke-linecap="round"/>
+      </symbol>
+
+      <!-- E 闪电徽章 -->
+      <symbol id="icE" viewBox="0 0 512 512">
+        <rect width="512" height="512" rx="116" fill="url(#gE)"/>
+        <rect x="1.5" y="1.5" width="509" height="509" rx="114.5" fill="none" stroke="#ffffff" stroke-opacity=".14" stroke-width="3"/>
+        <path d="M302 110 L168 300 H246 L214 402 L348 212 H270 Z" fill="#ffffff"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div class="sect">
+    <div class="sect-title">浅色背景</div>
+    <div class="band light">
+      <div class="card"><svg class="icon"><use href="#icA"/></svg><span class="label">A · 环形闪电</span><div class="small"><svg width="48" height="48"><use href="#icA"/></svg><svg width="32" height="32"><use href="#icA"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icB"/></svg><span class="label">B · 绿色电池</span><div class="small"><svg width="48" height="48"><use href="#icB"/></svg><svg width="32" height="32"><use href="#icB"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icC"/></svg><span class="label">C · 浅色电池</span><div class="small"><svg width="48" height="48"><use href="#icC"/></svg><svg width="32" height="32"><use href="#icC"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icD"/></svg><span class="label">D · 字母 C</span><div class="small"><svg width="48" height="48"><use href="#icD"/></svg><svg width="32" height="32"><use href="#icD"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icE"/></svg><span class="label">E · 闪电徽章</span><div class="small"><svg width="48" height="48"><use href="#icE"/></svg><svg width="32" height="32"><use href="#icE"/></svg></div></div>
+    </div>
+  </div>
+
+  <div class="sect">
+    <div class="sect-title">深色背景</div>
+    <div class="band dark">
+      <div class="card"><svg class="icon"><use href="#icA"/></svg><span class="label">A · 环形闪电</span><div class="small"><svg width="48" height="48"><use href="#icA"/></svg><svg width="32" height="32"><use href="#icA"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icB"/></svg><span class="label">B · 绿色电池</span><div class="small"><svg width="48" height="48"><use href="#icB"/></svg><svg width="32" height="32"><use href="#icB"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icC"/></svg><span class="label">C · 浅色电池</span><div class="small"><svg width="48" height="48"><use href="#icC"/></svg><svg width="32" height="32"><use href="#icC"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icD"/></svg><span class="label">D · 字母 C</span><div class="small"><svg width="48" height="48"><use href="#icD"/></svg><svg width="32" height="32"><use href="#icD"/></svg></div></div>
+      <div class="card"><svg class="icon"><use href="#icE"/></svg><span class="label">E · 闪电徽章</span><div class="small"><svg width="48" height="48"><use href="#icE"/></svg><svg width="32" height="32"><use href="#icE"/></svg></div></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
