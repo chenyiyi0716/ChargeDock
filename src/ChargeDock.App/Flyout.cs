@@ -412,27 +412,9 @@ public sealed class Flyout
             Settings.StartupEnabled = v;
             SettingsChanged?.Invoke();
         }));
-        root.Children.Add(SegRow("刷新间隔",
-            new[] { "30s", "60s", "5m" },
-            SelectedIndex(new[] { 30, 60, 300 }, Settings.RefreshIntervalSeconds),
-            i =>
-            {
-                Settings.RefreshIntervalSeconds = new[] { 30, 60, 300 }[i];
-                SettingsChanged?.Invoke();
-            }));
 
-        // 低电量提醒
+        // 低电量提醒(阈值固定 15%,鼠标 / 键盘)
         root.Children.Add(GroupTitle("低电量提醒 · 鼠标 / 键盘"));
-        root.Children.Add(ToggleRow("启用提醒", Settings.LowBatteryEnabled, v =>
-        {
-            Settings.LowBatteryEnabled = v;
-            SettingsChanged?.Invoke();
-        }));
-        root.Children.Add(StepperRow("提醒阈值", Settings.LowBatteryThreshold, 5, 50, v =>
-        {
-            Settings.LowBatteryThreshold = v;
-            SettingsChanged?.Invoke();
-        }));
         root.Children.Add(ToggleRow("弹窗提醒", Settings.PopupNotify, v =>
         {
             Settings.PopupNotify = v;

@@ -71,33 +71,25 @@ public static class Settings
         set => Write("Theme", value, RegistryValueKind.String);
     }
 
-    /// <summary>刷新间隔(秒):30 / 60 / 300,默认 60。</summary>
+    /// <summary>刷新间隔(秒):固定 10 秒,不再可配置。</summary>
     public static int RefreshIntervalSeconds
     {
-        get
-        {
-            int v = ReadInt("RefreshInterval", 60);
-            return v is 30 or 60 or 300 ? v : 60;
-        }
-        set => Write("RefreshInterval", value, RegistryValueKind.DWord);
+        get => 10;
+        set { }
     }
 
-    /// <summary>低电量提醒总开关(鼠标 / 键盘),默认开。</summary>
+    /// <summary>低电量提醒总开关(鼠标 / 键盘):固定开启。</summary>
     public static bool LowBatteryEnabled
     {
-        get => ReadBool("LowBatteryEnabled", true);
-        set => Write("LowBatteryEnabled", value ? 1 : 0, RegistryValueKind.DWord);
+        get => true;
+        set { }
     }
 
-    /// <summary>低电量提醒阈值(百分比),默认 15。</summary>
+    /// <summary>低电量提醒阈值(百分比):固定 15。</summary>
     public static int LowBatteryThreshold
     {
-        get
-        {
-            int v = ReadInt("LowBatteryThreshold", 15);
-            return Math.Clamp(v, 5, 50);
-        }
-        set => Write("LowBatteryThreshold", Math.Clamp(value, 5, 50), RegistryValueKind.DWord);
+        get => 15;
+        set { }
     }
 
     /// <summary>低电量时弹窗提醒,默认开。</summary>
