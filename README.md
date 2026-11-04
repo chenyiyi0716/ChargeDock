@@ -86,19 +86,28 @@ ChargeDock 只做一件事 —— **把电量摆在你眼前**：平时只是一
 
 ## 快速开始
 
-### 方式一：下载即用（推荐）
+### 方式一：安装版（推荐）
 
-1. 从 [Releases](../../releases) 下载 `ChargeDock.exe`
+1. 从 [Releases](../../releases) 下载 **`ChargeDock-Setup.exe`**
+2. 双击安装（可勾选创建桌面快捷方式），自动装到 `%LOCALAPPDATA%\Programs\ChargeDock\`
+3. 安装完自动启动，托盘出现环形电量图标即成功
+
+> 会注册到「设置 → 应用」，可直接在系统设置里卸载；也支持 `ChargeDock-Setup.exe /uninstall` 静默卸载，或运行 `build\uninstall.ps1`。
+
+### 方式二：便携版（免安装）
+
+1. 下载 **`ChargeDock.exe`**（自包含单文件）
 2. 放到任意目录（建议 `%LOCALAPPDATA%\Programs\ChargeDock\`）
 3. 双击运行 —— 托盘出现环形电量图标即成功
 
-> 免安装、自包含，无需 .NET 运行时。首次运行若出现 SmartScreen 提示，点「更多信息 → 仍要运行」即可（未签名）。
+> 免安装、不写卸载信息，删掉文件即完成卸载。首次运行若出现 SmartScreen 提示，点「更多信息 → 仍要运行」。
 
-### 方式二：从源码构建
+### 方式三：从源码构建
 
 ```powershell
 git clone <repo> && cd ChargeDock
-.\build\portable.ps1    # 编译 + 测试 + 发布 + 部署到 %LOCALAPPDATA% + 桌面快捷方式
+.\build\portable.ps1    # 编译 + 测试 + 发布便携版并部署
+.\build\publish.ps1     # 编译 + 测试 + 发布安装版 ChargeDock-Setup.exe
 ```
 
 ---
