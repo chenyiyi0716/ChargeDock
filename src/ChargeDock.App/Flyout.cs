@@ -184,8 +184,8 @@ public sealed class Flyout
                 ResizeMode = ResizeMode.NoResize,
                 SizeToContent = SizeToContent.WidthAndHeight,
             };
-            settingsWindow.Deactivated += (_, _) => settingsWindow!.Hide();
-            settingsWindow.KeyDown += (_, e) => { if (e.Key == Key.Escape) settingsWindow!.Hide(); };
+            settingsWindow.Deactivated += (_, _) => HideSettings();
+            settingsWindow.KeyDown += (_, e) => { if (e.Key == Key.Escape) HideSettings(); };
         }
         settingsWindow.Content = glass;
 
@@ -195,12 +195,54 @@ public sealed class Flyout
         double cardBottom = window.Top + window.ActualHeight;
         settingsWindow.Left = window.Left - 8 - panelWidth;
         settingsWindow.Top = Math.Max(SystemParameters.WorkArea.Top, cardBottom - panelHeight);
+
+        // 仿照卡片:内容从下方滑入(窗口底边裁切)
+        if (glass.RenderTransform is not TranslateTransform shift)
+        {
+            shift = new TranslateTransform(0, 0);
+            glass.RenderTransform = shift;
+        }
+        shift.BeginAnimation(TranslateTransform.YProperty, null);
+
+        if (!AnimationsEnabled)
+        {
+            shift.Y = 0;
+            settingsWindow.Show();
+            settingsWindow.Activate();
+            return;
+        }
+
+        shift.Y = 16;
         settingsWindow.Show();
         settingsWindow.Activate();
+
+        var slide = new DoubleAnimation(16, 0, TimeSpan.FromMilliseconds(240))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
-    /// <summary>收起设置面板。</summary>
-    public void HideSettings() => settingsWindow?.Hide();
+    /// <summary>收起设置面板(带下滑动画)。</summary>
+    public void HideSettings()
+    {
+        if (settingsWindow == null || !settingsWindow.IsVisible) return;
+
+        if (!AnimationsEnabled
+            || settingsWindow.Content is not Border glass
+            || glass.RenderTransform is not TranslateTransform shift)
+        {
+            settingsWindow.Hide();
+            return;
+        }
+
+        var slide = new DoubleAnimation(shift.Y, 16, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+        };
+        slide.Completed += (_, _) => settingsWindow.Hide();
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
+    }
 
     /// <summary>--render 用:亚克力只在真实窗口生效,渲染时给卡片一个可见底色。</summary>
     public void ApplyRenderFallback() => card.Background = new SolidColorBrush(Theme.CardBg);
