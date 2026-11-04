@@ -99,7 +99,7 @@ public sealed class Flyout
         {
             // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
-            window.Left = wa.Right - window.Width - 8;
+            window.Left = wa.Right - window.Width;
             window.Top = wa.Bottom - e.NewSize.Height;
         };
     }
@@ -572,7 +572,7 @@ public sealed class Flyout
 
         var wa = SystemParameters.WorkArea;
         double finalTop = wa.Bottom - h;
-        window.Left = wa.Right - window.Width - 8;
+        window.Left = wa.Right - window.Width;
         window.Top = finalTop;
         window.Opacity = 1;
         window.Show();
