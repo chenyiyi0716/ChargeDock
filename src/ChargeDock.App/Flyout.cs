@@ -329,13 +329,9 @@ public sealed class Flyout
         Grid.SetColumn(backBtn, 2);
         header.Children.Add(backBtn);
 
-        // 关闭(卡片视图 → 收起;设置视图 → 返回卡片)
+        // 关闭:任何视图下都收起卡片(设置页用左侧返回箭头回设备页)
         closeBtn = HeaderButton(DrawClose(Theme.IconFg));
-        closeBtn.MouseLeftButtonUp += (_, _) =>
-        {
-            if (showSettings) SetView(false);
-            else Hide();
-        };
+        closeBtn.MouseLeftButtonUp += (_, _) => Hide();
         Grid.SetColumn(closeBtn, 3);
         header.Children.Add(closeBtn);
 
