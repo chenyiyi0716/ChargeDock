@@ -46,20 +46,6 @@ public static class Theme
         ? Color.FromArgb(0xE8, 0x12, 0x14, 0x1C)
         : Color.FromArgb(0xE8, 0xFF, 0xFF, 0xFF);
 
-    /// <summary>系统级亚克力之上的主题着色(半透明,让玻璃跟随 App 明暗主题)。</summary>
-    public static Color GlassOverlay => IsDark
-        ? Color.FromArgb(0xC8, 0x11, 0x14, 0x1E)
-        : Color.FromArgb(0x90, 0xF8, 0xFA, 0xFD);
-
-    /// <summary>非分层窗口的实色背景(亚克力不可用时的兜底)。</summary>
-    public static Color SolidCardBg => IsDark
-        ? Color.FromRgb(0x11, 0x14, 0x1E)
-        : Color.FromRgb(0xF8, 0xFA, 0xFD);
-
-    /// <summary>亚克力着色(alpha 控制着色强度)。</summary>
-    public static Color AcrylicTint => IsDark
-        ? Color.FromArgb(0x9E, 0x11, 0x14, 0x1E)
-        : Color.FromArgb(0x9E, 0xF8, 0xFA, 0xFD);
 
     /// <summary>卡片描边(柔和)。</summary>
     public static Color CardBorder => IsDark
