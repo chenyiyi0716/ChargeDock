@@ -84,7 +84,7 @@ public sealed class Flyout
         {
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(20),
-            Background = new SolidColorBrush(Theme.GlassOverlay),
+            Background = Brushes.Transparent,
         };
 
         root = new StackPanel();
@@ -123,7 +123,8 @@ public sealed class Flyout
 
     void ApplyShellColors()
     {
-        if (card != null) card.Background = new SolidColorBrush(Theme.GlassOverlay);
+        // 纯毛玻璃:卡片本身不加颜色,只靠 DWM 系统亚克力
+        if (card != null) card.Background = Brushes.Transparent;
         if (window.IsVisible) ApplySystemGlass();
     }
 

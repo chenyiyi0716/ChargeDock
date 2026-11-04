@@ -64,7 +64,7 @@ public sealed class TrayMenu
         {
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(6),
-            Background = new SolidColorBrush(Theme.GlassOverlay),
+            Background = Brushes.Transparent,
         };
         panel = new StackPanel { Width = MenuWidth };
         card.Child = panel;
@@ -86,7 +86,7 @@ public sealed class TrayMenu
     void Build()
     {
         panel.Children.Clear();
-        card.Background = new SolidColorBrush(Theme.GlassOverlay);
+        card.Background = Brushes.Transparent;
 
         // 显示电量(+ 最低电量提示)
         showHint = Txt(lastLevel < 0 ? "—" : lastLevel + "%", 11, Theme.Muted, false);
