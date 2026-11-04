@@ -43,7 +43,7 @@ public sealed class TrayMenu
         window = new Window
         {
             WindowStyle = WindowStyle.None,
-            AllowsTransparency = false,
+            AllowsTransparency = true,
             Background = Brushes.Transparent,
             ShowInTaskbar = false,
             Topmost = true,
@@ -51,42 +51,28 @@ public sealed class TrayMenu
             SizeToContent = SizeToContent.WidthAndHeight,
         };
 
-        System.Windows.Shell.WindowChrome.SetWindowChrome(window, new System.Windows.Shell.WindowChrome
-        {
-            GlassFrameThickness = new Thickness(-1),
-            CornerRadius = new CornerRadius(0),
-            CaptionHeight = 0,
-            ResizeBorderThickness = new Thickness(0),
-            UseAeroCaptionButtons = false,
-        });
-
         card = new Border
         {
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(16),
             Padding = new Thickness(6),
-            Background = Brushes.Transparent,
+            Background = new SolidColorBrush(Theme.CardBg),
+            BorderBrush = new SolidColorBrush(Theme.CardBorder),
+            BorderThickness = new Thickness(1),
+            Effect = new DropShadowEffect { BlurRadius = 20, ShadowDepth = 0, Opacity = 0.28, Color = Colors.Black },
         };
         panel = new StackPanel { Width = MenuWidth };
         card.Child = panel;
         window.Content = card;
 
-        window.SourceInitialized += (_, _) => ApplyGlass();
         window.Deactivated += (_, _) => Hide();
         window.KeyDown += (_, e) => { if (e.Key == Key.Escape) Hide(); };
-    }
-
-    void ApplyGlass()
-    {
-        var hwnd = new WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero) return;
-        GlassEffect.ApplySystemAcrylic(hwnd, Theme.IsDark);
-        GlassEffect.ApplyNativeRoundedCorners(hwnd);
     }
 
     void Build()
     {
         panel.Children.Clear();
-        card.Background = Brushes.Transparent;
+        card.Background = new SolidColorBrush(Theme.CardBg);
+        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
 
         // 显示电量(+ 最低电量提示)
         showHint = Txt(lastLevel < 0 ? "—" : lastLevel + "%", 11, Theme.Muted, false);

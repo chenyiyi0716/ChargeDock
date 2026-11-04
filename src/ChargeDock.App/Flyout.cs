@@ -57,11 +57,11 @@ public sealed class Flyout
 
     public Flyout()
     {
-        // 经典亚克力毛玻璃(SetWindowCompositionAttribute)+ 圆角窗口区域。
+        // 分层窗口:圆角与玻璃底由卡片自己绘制,整张卡可以 GPU 合成滑动。
         window = new Window
         {
             WindowStyle = WindowStyle.None,
-            AllowsTransparency = false,
+            AllowsTransparency = true,
             Background = Brushes.Transparent,
             ShowInTaskbar = false,
             Topmost = true,
@@ -70,21 +70,14 @@ public sealed class Flyout
             Width = CardWidth,
         };
 
-        // 正规做法:把客户区交给 DWM 的玻璃帧,系统级亚克力才能铺满整个窗口
-        System.Windows.Shell.WindowChrome.SetWindowChrome(window, new System.Windows.Shell.WindowChrome
-        {
-            GlassFrameThickness = new Thickness(-1),
-            CornerRadius = new CornerRadius(0),
-            CaptionHeight = 0,
-            ResizeBorderThickness = new Thickness(0),
-            UseAeroCaptionButtons = false,
-        });
-
         card = new Border
         {
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(22),
             Padding = new Thickness(20),
-            Background = Brushes.Transparent,
+            Background = new SolidColorBrush(Theme.CardBg),
+            BorderBrush = new SolidColorBrush(Theme.CardBorder),
+            BorderThickness = new Thickness(1),
+            Effect = new DropShadowEffect { BlurRadius = 26, ShadowDepth = 0, Opacity = 0.30, Color = Colors.Black },
         };
 
         root = new StackPanel();
@@ -102,10 +95,8 @@ public sealed class Flyout
         ApplyShellColors();
         SetView(false, animate: false);
 
-        window.SourceInitialized += (_, _) => ApplySystemGlass();
         window.SizeChanged += (_, e) =>
         {
-            ApplySystemGlass();
             // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
             window.Left = wa.Right - window.Width - 8;
@@ -113,19 +104,11 @@ public sealed class Flyout
         };
     }
 
-    void ApplySystemGlass()
-    {
-        var hwnd = new WindowInteropHelper(window).Handle;
-        if (hwnd == IntPtr.Zero) return;
-        GlassEffect.ApplySystemAcrylic(hwnd, Theme.IsDark);
-        GlassEffect.ApplyNativeRoundedCorners(hwnd);
-    }
-
     void ApplyShellColors()
     {
-        // 纯毛玻璃:卡片本身不加颜色,只靠 DWM 系统亚克力
-        if (card != null) card.Background = Brushes.Transparent;
-        if (window.IsVisible) ApplySystemGlass();
+        if (card == null) return;
+        card.Background = new SolidColorBrush(Theme.CardBg);
+        card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
     }
 
     /// <summary>--render 用:亚克力只在真实窗口生效,渲染时给卡片一个可见底色。</summary>
