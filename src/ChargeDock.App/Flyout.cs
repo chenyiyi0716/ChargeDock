@@ -420,11 +420,6 @@ public sealed class Flyout
             Settings.PopupNotify = v;
             SettingsChanged?.Invoke();
         }));
-        root.Children.Add(ToggleRow("卡片变色", Settings.CardColorChange, v =>
-        {
-            Settings.CardColorChange = v;
-            SettingsChanged?.Invoke();
-        }));
 
         // 外观
         root.Children.Add(GroupTitle("外观"));

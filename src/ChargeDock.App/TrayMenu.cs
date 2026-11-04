@@ -287,7 +287,7 @@ public sealed class TrayMenu
         return l;
     }
 
-    /// <summary>菜单内置的小开关(开机自启)。</summary>
+    /// <summary>菜单内置的小开关(开机自启)。与卡片里的开关保持同一套尺寸/圆角。</summary>
     sealed class ToggleItem
     {
         public Border Root = null!;
@@ -295,36 +295,45 @@ public sealed class TrayMenu
         readonly TranslateTransform shift;
         bool on;
 
+        const double TrackW = 40;
+        const double TrackH = 23;
+        const double KnobSize = 18;
+        const double KnobMargin = 2.5;
+        static double KnobTravel => TrackW - KnobSize - KnobMargin * 2;
+
         public ToggleItem(bool initial, Action<bool> onChanged)
         {
             on = initial;
             Root = new Border
             {
-                Width = 34,
-                Height = 20,
-                CornerRadius = new CornerRadius(99),
+                Width = TrackW,
+                Height = TrackH,
+                CornerRadius = new CornerRadius(TrackH / 2),
                 Cursor = Cursors.Hand,
-                Background = new SolidColorBrush(on ? ToggleOn : Theme.ToggleOff),
+                Background = new SolidColorBrush(on ? Theme.ToggleOn : Theme.ToggleOff),
             };
             knob = new Border
             {
-                Width = 16,
-                Height = 16,
-                CornerRadius = new CornerRadius(8),
+                Width = KnobSize,
+                Height = KnobSize,
+                CornerRadius = new CornerRadius(KnobSize / 2),
                 Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                BorderThickness = new Thickness(1),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 0, 0, 0),
+                Margin = new Thickness(KnobMargin, 0, 0, 0),
+                Effect = new DropShadowEffect { BlurRadius = 4, ShadowDepth = 1, Opacity = 0.35 },
             };
-            shift = new TranslateTransform(on ? 16 : 0, 0);
+            shift = new TranslateTransform(on ? KnobTravel : 0, 0);
             knob.RenderTransform = shift;
             Root.Child = knob;
 
             Root.MouseLeftButtonUp += (_, _) =>
             {
                 on = !on;
-                Root.Background = new SolidColorBrush(on ? ToggleOn : Theme.ToggleOff);
-                shift.X = on ? 16 : 0;
+                Root.Background = new SolidColorBrush(on ? Theme.ToggleOn : Theme.ToggleOff);
+                shift.X = on ? KnobTravel : 0;
                 onChanged(on);
             };
         }
@@ -332,10 +341,8 @@ public sealed class TrayMenu
         public void Set(bool value)
         {
             on = value;
-            Root.Background = new SolidColorBrush(on ? ToggleOn : Theme.ToggleOff);
-            shift.X = on ? 16 : 0;
+            Root.Background = new SolidColorBrush(on ? Theme.ToggleOn : Theme.ToggleOff);
+            shift.X = on ? KnobTravel : 0;
         }
-
-        static Color ToggleOn => Color.FromRgb(0x2E, 0x5D, 0x4E);
     }
 }
