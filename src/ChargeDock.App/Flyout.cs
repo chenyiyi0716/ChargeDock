@@ -700,8 +700,9 @@ public sealed class Flyout
 
         if (kind == DeviceKind.Mouse)
         {
-            c.Children.Add(RoundRect(8, 3, 8, 16, 4, null, stroke, 1.6));
-            c.Children.Add(Line(12, 3, 12, 7, stroke, 1.6));
+            // 鼠标:圆角机身(胶囊)+ 顶部滚轮/按键分割线(不接机身边缘,避免看成袋子)
+            c.Children.Add(RoundRect(5.5, 2, 13, 20, 6.5, null, stroke, 1.6));
+            c.Children.Add(Line(12, 4.2, 12, 9.6, stroke, 1.6));
         }
         else if (kind == DeviceKind.Keyboard)
         {
