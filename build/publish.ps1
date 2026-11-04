@@ -34,8 +34,8 @@ Copy-Item (Join-Path $publishDir 'ChargeDock.exe') (Join-Path $payloadDir 'Charg
 Remove-Item (Join-Path $repo 'src\ChargeDock.Installer\obj') -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $repo 'src\ChargeDock.Installer\bin') -Recurse -Force -ErrorAction SilentlyContinue
 
-# 3.1) 发布安装器:自包含单文件(文档要求的"单文件安装 EXE")
-& $dotnet publish $installer -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $outDir -nologo
+# 3.1) 发布安装器:框架依赖单文件(只含安装器逻辑 + 内嵌 payload,不重复打包 .NET 运行时)
+& $dotnet publish $installer -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $outDir -nologo
 if ($LASTEXITCODE -ne 0) { throw "installer publish failed" }
 
 # 3.2) 给安装包签名
