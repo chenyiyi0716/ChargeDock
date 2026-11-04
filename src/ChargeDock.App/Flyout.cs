@@ -724,7 +724,11 @@ public sealed class Flyout
     /// <summary>卡片已显示时不重复弹出(用于托盘菜单「显示电量」,避免把卡片收起来)。</summary>
     public void ShowIfHidden()
     {
-        if (!window.IsVisible) Show();
+        if (!window.IsVisible)
+        {
+            SetView(false);
+            Show();
+        }
     }
 
     public void Show()
@@ -792,7 +796,12 @@ public sealed class Flyout
     public void Toggle()
     {
         if (window.IsVisible) Hide();
-        else Show();
+        else
+        {
+            // 托盘唤出时总是回到主页面(设备页),不保留上次的设置页
+            SetView(false);
+            Show();
+        }
     }
 
     /// <summary>主题切换:淡出旧内容 → 换主题 → 淡入新内容,形成平滑过渡。</summary>
