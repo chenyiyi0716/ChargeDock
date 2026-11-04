@@ -591,8 +591,10 @@ public sealed class Flyout
             return;
         }
 
-        shift.Y = 8;
-        var slide = new DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(280))
+        // 从任务栏上方升出:整张卡从自身高度处上移到最终位置
+        double travel = Math.Max(8, h);
+        shift.Y = travel;
+        var slide = new DoubleAnimation(travel, 0, TimeSpan.FromMilliseconds(300))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
         };
@@ -609,8 +611,9 @@ public sealed class Flyout
             return;
         }
 
-        // 向工作区底边滑出(只位移内容,不动窗口)
-        var slide = new DoubleAnimation(shift.Y, 8, TimeSpan.FromMilliseconds(200))
+        // 沉入任务栏:整张卡下滑自身高度,在任务栏顶部被裁掉
+        double travel = Math.Max(8, card.ActualHeight > 0 ? card.ActualHeight : 340);
+        var slide = new DoubleAnimation(shift.Y, travel, TimeSpan.FromMilliseconds(240))
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
         };
