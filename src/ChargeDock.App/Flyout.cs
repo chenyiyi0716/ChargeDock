@@ -69,8 +69,9 @@ public sealed class Flyout
             ShowInTaskbar = false,
             Topmost = true,
             ResizeMode = ResizeMode.NoResize,
-            SizeToContent = SizeToContent.Height,
+            SizeToContent = SizeToContent.Manual,
             Width = CardWidth,
+            Height = 340,
         };
 
         card = new Border
@@ -100,13 +101,7 @@ public sealed class Flyout
         ApplyShellColors();
         SetView(false, animate: false);
 
-        window.SizeChanged += (_, e) =>
-        {
-            // 卡片固定贴右下角
-            var wa = SystemParameters.WorkArea;
-            window.Left = wa.Right - window.Width - 8;
-            window.Top = wa.Bottom - e.NewSize.Height;
-        };
+        card.SizeChanged += (_, _) => ApplyCardSize(animate: true);
     }
 
     void ApplyShellColors()
@@ -114,6 +109,46 @@ public sealed class Flyout
         if (card == null) return;
         card.Background = new SolidColorBrush(Theme.CardBg);
         card.BorderBrush = new SolidColorBrush(Theme.CardBorder);
+    }
+
+    double targetCardHeight = -1;
+    bool sizingCard;
+
+    /// <summary>内容尺寸变化时,窗口高度做平滑过渡(底边固定,向上/向下伸缩)。</summary>
+    void ApplyCardSize(bool animate)
+    {
+        if (card == null || sizingCard) return;
+        sizingCard = true;
+        try
+        {
+            card.Measure(new Size(CardWidth, double.PositiveInfinity));
+            double target = card.DesiredSize.Height;
+            if (target <= 0) return;
+            if (Math.Abs(target - targetCardHeight) < 0.5) return;
+            targetCardHeight = target;
+
+            var wa = SystemParameters.WorkArea;
+            window.Left = wa.Right - window.Width - 8;
+
+            if (!animate || !AnimationsEnabled || !window.IsVisible || window.ActualHeight <= 0)
+            {
+                window.BeginAnimation(FrameworkElement.HeightProperty, null);
+                window.BeginAnimation(Window.TopProperty, null);
+                window.Height = target;
+                window.Top = wa.Bottom - target;
+                return;
+            }
+
+            double fromHeight = window.ActualHeight;
+            var dur = TimeSpan.FromMilliseconds(220);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            window.BeginAnimation(FrameworkElement.HeightProperty, new DoubleAnimation(fromHeight, target, dur) { EasingFunction = ease });
+            window.BeginAnimation(Window.TopProperty, new DoubleAnimation(wa.Bottom - fromHeight, wa.Bottom - target, dur) { EasingFunction = ease });
+        }
+        finally
+        {
+            sizingCard = false;
+        }
     }
 
     /// <summary>设置面板:从卡片左侧弹出(独立窗口,不覆盖卡片)。</summary>
@@ -695,12 +730,15 @@ public sealed class Flyout
         // 首帧窗口尚未布局(ActualHeight 为 0),先测量卡片内容拿到真实高度,避免首次定位偏移
         card.Measure(new Size(window.Width, double.PositiveInfinity));
         double h = card.DesiredSize.Height > 0 ? card.DesiredSize.Height : 340;
+        targetCardHeight = h;
 
         var wa = SystemParameters.WorkArea;
         // h 已包含卡片底部 8px 边距,窗口底边正好落在任务栏上沿
-        double finalTop = wa.Bottom - h;
+        window.BeginAnimation(FrameworkElement.HeightProperty, null);
+        window.BeginAnimation(Window.TopProperty, null);
+        window.Height = h;
         window.Left = wa.Right - window.Width - 8;
-        window.Top = finalTop;
+        window.Top = wa.Bottom - h;
         window.Opacity = 1;
         window.Show();
         window.Activate();
