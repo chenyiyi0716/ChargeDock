@@ -74,6 +74,8 @@ public sealed class Flyout
         {
             CornerRadius = new CornerRadius(22),
             Padding = new Thickness(20),
+            // 底部留 8px:窗口延伸到任务栏上沿,卡片下移时由窗口底边裁掉
+            Margin = new Thickness(0, 0, 0, 8),
             Background = new SolidColorBrush(Theme.CardBg),
             BorderBrush = new SolidColorBrush(Theme.CardBorder),
             BorderThickness = new Thickness(1),
@@ -100,7 +102,7 @@ public sealed class Flyout
             // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
             window.Left = wa.Right - window.Width - 8;
-            window.Top = wa.Bottom - e.NewSize.Height - 8;
+            window.Top = wa.Bottom - e.NewSize.Height;
         };
     }
 
@@ -571,7 +573,8 @@ public sealed class Flyout
         double h = card.DesiredSize.Height > 0 ? card.DesiredSize.Height : 340;
 
         var wa = SystemParameters.WorkArea;
-        double finalTop = wa.Bottom - h - 8;
+        // h 已包含卡片底部 8px 边距,窗口底边正好落在任务栏上沿
+        double finalTop = wa.Bottom - h;
         window.Left = wa.Right - window.Width - 8;
         window.Top = finalTop;
         window.Opacity = 1;
@@ -582,58 +585,43 @@ public sealed class Flyout
 
         if (!AnimationsEnabled)
         {
-            card.Clip = null;
+            if (card.RenderTransform is TranslateTransform t0) t0.Y = 0;
             return;
         }
 
-        // 从任务栏上方升起:卡片顶部从底边升起(底边固定在任务栏上方)
-        AnimateCardVertical(show: true);
+        // 整卡向上平移(从窗口底边升起;下移时由窗口底边=任务栏上沿裁掉)
+        double travel = Math.Max(8, card.ActualHeight + 8);
+        if (card.RenderTransform is not TranslateTransform shift)
+        {
+            shift = new TranslateTransform(0, 0);
+            card.RenderTransform = shift;
+        }
+        shift.Y = travel;
+        var slide = new DoubleAnimation(travel, 0, TimeSpan.FromMilliseconds(320))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
     public void Hide()
     {
         if (!window.IsVisible) return;
 
-        if (!AnimationsEnabled)
+        if (!AnimationsEnabled || card.RenderTransform is not TranslateTransform shift)
         {
             window.Hide();
             return;
         }
 
-        // 沉入任务栏:卡片顶部往下缩、底边固定,看起来像沉进任务栏
-        AnimateCardVertical(show: false);
-    }
-
-    /// <summary>卡片上下裁切动画:底边固定在工作区底边,顶部上移/下移。</summary>
-    void AnimateCardVertical(bool show)
-    {
-        double w = Math.Max(1, card.ActualWidth);
-        double h = Math.Max(1, card.ActualHeight);
-
-        var from = show ? new Rect(0, h, w, 0) : new Rect(0, 0, w, h);
-        var to = show ? new Rect(0, 0, w, h) : new Rect(0, h, w, 0);
-
-        if (card.Clip is not RectangleGeometry geo)
+        // 整卡向下平移,越过任务栏上沿的部分被窗口底边裁掉(看起来沉进任务栏)
+        double travel = Math.Max(8, card.ActualHeight + 8);
+        var slide = new DoubleAnimation(shift.Y, travel, TimeSpan.FromMilliseconds(240))
         {
-            geo = new RectangleGeometry();
-            card.Clip = geo;
-        }
-        geo.BeginAnimation(RectangleGeometry.RectProperty, null);
-        geo.Rect = from;
-
-        var anim = new RectAnimation(from, to, TimeSpan.FromMilliseconds(show ? 320 : 240))
-        {
-            EasingFunction = new CubicEase { EasingMode = show ? EasingMode.EaseOut : EasingMode.EaseIn },
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
         };
-        if (show)
-        {
-            anim.Completed += (_, _) => card.Clip = null;
-        }
-        else
-        {
-            anim.Completed += (_, _) => window.Hide();
-        }
-        geo.BeginAnimation(RectangleGeometry.RectProperty, anim);
+        slide.Completed += (_, _) => window.Hide();
+        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
     public void Toggle()
