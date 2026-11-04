@@ -578,47 +578,62 @@ public sealed class Flyout
         window.Show();
         window.Activate();
 
-        // 从工作区底边滑入:只位移卡片内容(GPU 合成,丝滑);不动窗口 Top(SetWindowPos 逐帧重定位会卡顿)
-        if (card.RenderTransform is not TranslateTransform shift)
-        {
-            shift = new TranslateTransform(0, 0);
-            card.RenderTransform = shift;
-        }
+        window.UpdateLayout();
 
         if (!AnimationsEnabled)
         {
-            shift.Y = 0;
+            card.Clip = null;
             return;
         }
 
-        // 从任务栏上方升出:整张卡从自身高度处上移到最终位置
-        double travel = Math.Max(8, h);
-        shift.Y = travel;
-        var slide = new DoubleAnimation(travel, 0, TimeSpan.FromMilliseconds(300))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        };
-        shift.BeginAnimation(TranslateTransform.YProperty, slide);
+        // 从任务栏上方升起:卡片顶部从底边升起(底边固定在任务栏上方)
+        AnimateCardVertical(show: true);
     }
 
     public void Hide()
     {
         if (!window.IsVisible) return;
 
-        if (!AnimationsEnabled || card.RenderTransform is not TranslateTransform shift)
+        if (!AnimationsEnabled)
         {
             window.Hide();
             return;
         }
 
-        // 沉入任务栏:整张卡下滑自身高度,在任务栏顶部被裁掉
-        double travel = Math.Max(8, card.ActualHeight > 0 ? card.ActualHeight : 340);
-        var slide = new DoubleAnimation(shift.Y, travel, TimeSpan.FromMilliseconds(240))
+        // 沉入任务栏:卡片顶部往下缩、底边固定,看起来像沉进任务栏
+        AnimateCardVertical(show: false);
+    }
+
+    /// <summary>卡片上下裁切动画:底边固定在工作区底边,顶部上移/下移。</summary>
+    void AnimateCardVertical(bool show)
+    {
+        double w = Math.Max(1, card.ActualWidth);
+        double h = Math.Max(1, card.ActualHeight);
+
+        var from = show ? new Rect(0, h, w, 0) : new Rect(0, 0, w, h);
+        var to = show ? new Rect(0, 0, w, h) : new Rect(0, h, w, 0);
+
+        if (card.Clip is not RectangleGeometry geo)
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+            geo = new RectangleGeometry();
+            card.Clip = geo;
+        }
+        geo.BeginAnimation(RectangleGeometry.RectProperty, null);
+        geo.Rect = from;
+
+        var anim = new RectAnimation(from, to, TimeSpan.FromMilliseconds(show ? 320 : 240))
+        {
+            EasingFunction = new CubicEase { EasingMode = show ? EasingMode.EaseOut : EasingMode.EaseIn },
         };
-        slide.Completed += (_, _) => window.Hide();
-        shift.BeginAnimation(TranslateTransform.YProperty, slide);
+        if (show)
+        {
+            anim.Completed += (_, _) => card.Clip = null;
+        }
+        else
+        {
+            anim.Completed += (_, _) => window.Hide();
+        }
+        geo.BeginAnimation(RectangleGeometry.RectProperty, anim);
     }
 
     public void Toggle()
