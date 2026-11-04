@@ -589,20 +589,19 @@ public sealed class Flyout
         var wa = SystemParameters.WorkArea;
         double finalTop = wa.Bottom - h - 8;
         window.Left = wa.Right - window.Width - 8;
+        window.Opacity = 1;
 
         if (!AnimationsEnabled)
         {
             window.Top = finalTop;
             window.Show();
             window.Activate();
-            window.Opacity = 1;
             return;
         }
 
-        // 从任务栏上方弹出:卡片底边从任务栏上沿(工作区底边)开始滑入,同时淡入
+        // 从工作区底边滑入(只做位移,不加透明度过渡)
         double startTop = finalTop + 8;
         window.Top = startTop;
-        window.Opacity = 0;
         window.Show();
         window.Activate();
 
@@ -616,23 +615,26 @@ public sealed class Flyout
             window.Top = finalTop;
         };
         window.BeginAnimation(Window.TopProperty, slide);
-
-        var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(200))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        };
-        window.BeginAnimation(UIElement.OpacityProperty, fade);
     }
 
     public void Hide()
     {
         if (!window.IsVisible) return;
 
-        if (!AnimationsEnabled) { window.Hide(); return; }
+        if (!AnimationsEnabled)
+        {
+            window.Hide();
+            return;
+        }
 
-        var fade = new DoubleAnimation(window.Opacity, 0, TimeSpan.FromMilliseconds(120)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
-        fade.Completed += (_, _) => { window.Hide(); window.Opacity = 1; };
-        window.BeginAnimation(UIElement.OpacityProperty, fade);
+        // 从工作区底边滑出(只做位移,不加透明度过渡)
+        double from = window.Top;
+        var slide = new DoubleAnimation(from, from + 8, TimeSpan.FromMilliseconds(220))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+        };
+        slide.Completed += (_, _) => window.Hide();
+        window.BeginAnimation(Window.TopProperty, slide);
     }
 
     public void Toggle()
