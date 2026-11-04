@@ -101,7 +101,8 @@ public sealed class Flyout
         ApplyShellColors();
         SetView(false, animate: false);
 
-        card.SizeChanged += (_, _) => ApplyCardSize(animate: true);
+        // 内容面板尺寸变化 = 卡片内容高度变化(卡片本身被窗口拉伸,card.SizeChanged 不会触发)
+        bodyPanel.SizeChanged += (_, _) => ApplyCardSize(animate: true);
     }
 
     void ApplyShellColors()
@@ -121,8 +122,9 @@ public sealed class Flyout
         sizingCard = true;
         try
         {
-            card.Measure(new Size(CardWidth, double.PositiveInfinity));
-            double target = card.DesiredSize.Height;
+            // 卡片本身被窗口拉伸,DesiredSize 不可靠;测内容根节点的自然高度
+            root.Measure(new Size(CardWidth - 40, double.PositiveInfinity));
+            double target = root.DesiredSize.Height + 48;
             if (target <= 0) return;
             if (Math.Abs(target - targetCardHeight) < 0.5) return;
             targetCardHeight = target;
@@ -727,9 +729,9 @@ public sealed class Flyout
 
     public void Show()
     {
-        // 首帧窗口尚未布局(ActualHeight 为 0),先测量卡片内容拿到真实高度,避免首次定位偏移
-        card.Measure(new Size(window.Width, double.PositiveInfinity));
-        double h = card.DesiredSize.Height > 0 ? card.DesiredSize.Height : 340;
+        // 首帧窗口尚未布局,测量内容根节点拿到自然高度
+        root.Measure(new Size(CardWidth - 40, double.PositiveInfinity));
+        double h = root.DesiredSize.Height > 0 ? root.DesiredSize.Height + 48 : 340;
         targetCardHeight = h;
 
         var wa = SystemParameters.WorkArea;
