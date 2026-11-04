@@ -1,46 +1,47 @@
-# ChargeDock 卸载脚本(便携版)
-# 用法:右键「使用 PowerShell 运行」,或在终端执行  .\build\uninstall.ps1
-# 清理内容:进程 / 开机自启 / 注册表配置 / 程序目录 / 桌面快捷方式
+# ChargeDock uninstall (portable build)
+# Usage: right-click "Run with PowerShell", or:  .\build\uninstall.ps1
+# Cleans: process / startup entry / registry config / program dir / desktop shortcut
+# NOTE: keep this file ASCII-only - Windows PowerShell 5.1 misparses UTF-8 without BOM.
 
 $ErrorActionPreference = 'SilentlyContinue'
-Write-Host '== ChargeDock 卸载 ==' -ForegroundColor Cyan
+Write-Host '== ChargeDock uninstall ==' -ForegroundColor Cyan
 
 $progDir = Join-Path $env:LOCALAPPDATA 'Programs\ChargeDock'
 $runKey  = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $cfgKey  = 'HKCU:\Software\ChargeDock'
 $lnk     = Join-Path ([Environment]::GetFolderPath('Desktop')) 'ChargeDock.lnk'
 
-# 1) 结束进程(程序运行时会锁文件,必须先退出)
+# 1) stop the running instance (it locks the exe)
 $p = Get-Process ChargeDock -ErrorAction SilentlyContinue
 if ($p) {
     $p | Stop-Process -Force
     Start-Sleep -Milliseconds 1500
-    Write-Host '· 已结束进程'
+    Write-Host ' - process stopped'
 }
 
-# 2) 移除开机自启
+# 2) remove the startup entry
 if (Get-ItemProperty -Path $runKey -Name 'ChargeDock' -ErrorAction SilentlyContinue) {
     Remove-ItemProperty -Path $runKey -Name 'ChargeDock'
-    Write-Host '· 已移除开机自启'
+    Write-Host ' - startup entry removed'
 }
 
-# 3) 删除配置(主题 / 开关等全部设置)
+# 3) remove settings (theme / toggles)
 if (Test-Path $cfgKey) {
     Remove-Item -Path $cfgKey -Recurse -Force
-    Write-Host '· 已删除注册表配置 HKCU\Software\ChargeDock'
+    Write-Host ' - settings removed'
 }
 
-# 4) 删除程序目录
+# 4) remove the program dir
 if (Test-Path $progDir) {
     Remove-Item -Path $progDir -Recurse -Force
-    Write-Host "· 已删除程序目录 $progDir"
+    Write-Host " - removed $progDir"
 }
 
-# 5) 删除桌面快捷方式
+# 5) remove the desktop shortcut
 if (Test-Path $lnk) {
     Remove-Item $lnk -Force
-    Write-Host '· 已删除桌面快捷方式'
+    Write-Host ' - shortcut removed'
 }
 
 Write-Host ''
-Write-Host '✓ ChargeDock 已卸载完毕' -ForegroundColor Green
+Write-Host 'ChargeDock uninstalled.' -ForegroundColor Green

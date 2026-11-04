@@ -44,8 +44,6 @@ public sealed class Flyout
     bool showSettings;
     /// <summary>最近一次读数缓存:视图重建(主题切换/视图切换)后回填,避免数据空白。</summary>
     List<BatteryReading> lastReadings = new();
-    /// <summary>设置面板窗口(独立窗口,从卡片左侧弹出,不覆盖卡片)。</summary>
-    Window? settingsWindow;
 
     // 设备行(持久化,更新时不重建,保证电量条动画)
     DeviceRowView? mouseRow, keyboardRow, headsetRow;
@@ -151,135 +149,6 @@ public sealed class Flyout
         {
             sizingCard = false;
         }
-    }
-
-    /// <summary>设置面板:从卡片左侧弹出(独立窗口,不覆盖卡片)。</summary>
-    public void ShowSettings()
-    {
-        const double panelWidth = 300;
-
-        var glass = new Border
-        {
-            Width = panelWidth,
-            CornerRadius = new CornerRadius(22),
-            Padding = new Thickness(20),
-            Background = new SolidColorBrush(Theme.CardBg),
-            BorderBrush = new SolidColorBrush(Theme.CardBorder),
-            BorderThickness = new Thickness(1),
-            Effect = new DropShadowEffect { BlurRadius = 26, ShadowDepth = 0, Opacity = 0.30, Color = Colors.Black },
-        };
-
-        var panel = new StackPanel();
-
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var title = Txt("设置", 15, Theme.Fg, true);
-        title.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(title, 0);
-        head.Children.Add(title);
-
-        var close = new Border
-        {
-            Width = 28,
-            Height = 28,
-            CornerRadius = new CornerRadius(8),
-            Background = new SolidColorBrush(Theme.IconBg),
-            Cursor = Cursors.Hand,
-        };
-        var cvb = new Viewbox
-        {
-            Width = 16,
-            Height = 16,
-            Stretch = Stretch.Uniform,
-            Child = DrawClose(Theme.IconFg),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        close.Child = cvb;
-        close.MouseLeftButtonUp += (_, _) => HideSettings();
-        Grid.SetColumn(close, 1);
-        head.Children.Add(close);
-        panel.Children.Add(head);
-
-        panel.Children.Add(new Border { Height = 1, Background = new SolidColorBrush(Theme.Divider), Margin = new Thickness(0, 14, 0, 0) });
-
-        var body = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
-        body.Children.Add(BuildSettingsView());
-        panel.Children.Add(body);
-
-        glass.Child = panel;
-
-        if (settingsWindow == null)
-        {
-            settingsWindow = new Window
-            {
-                WindowStyle = WindowStyle.None,
-                AllowsTransparency = true,
-                Background = Brushes.Transparent,
-                ShowInTaskbar = false,
-                Topmost = true,
-                ResizeMode = ResizeMode.NoResize,
-                SizeToContent = SizeToContent.WidthAndHeight,
-            };
-            settingsWindow.Deactivated += (_, _) => HideSettings();
-            settingsWindow.KeyDown += (_, e) => { if (e.Key == Key.Escape) HideSettings(); };
-        }
-        settingsWindow.Content = glass;
-
-        // 位置:面板右边 = 卡片左边 - 8,底边与卡片底边对齐,向上展开
-        glass.Measure(new Size(panelWidth, double.PositiveInfinity));
-        double panelHeight = glass.DesiredSize.Height;
-        double cardBottom = window.Top + window.ActualHeight;
-        settingsWindow.Left = window.Left - 8 - panelWidth;
-        settingsWindow.Top = Math.Max(SystemParameters.WorkArea.Top, cardBottom - panelHeight);
-
-        // 仿照卡片:内容从下方滑入(窗口底边裁切)
-        if (glass.RenderTransform is not TranslateTransform shift)
-        {
-            shift = new TranslateTransform(0, 0);
-            glass.RenderTransform = shift;
-        }
-        shift.BeginAnimation(TranslateTransform.YProperty, null);
-
-        if (!AnimationsEnabled)
-        {
-            shift.Y = 0;
-            settingsWindow.Show();
-            settingsWindow.Activate();
-            return;
-        }
-
-        shift.Y = 16;
-        settingsWindow.Show();
-        settingsWindow.Activate();
-
-        var slide = new DoubleAnimation(16, 0, TimeSpan.FromMilliseconds(240))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        };
-        shift.BeginAnimation(TranslateTransform.YProperty, slide);
-    }
-
-    /// <summary>收起设置面板(带下滑动画)。</summary>
-    public void HideSettings()
-    {
-        if (settingsWindow == null || !settingsWindow.IsVisible) return;
-
-        if (!AnimationsEnabled
-            || settingsWindow.Content is not Border glass
-            || glass.RenderTransform is not TranslateTransform shift)
-        {
-            settingsWindow.Hide();
-            return;
-        }
-
-        var slide = new DoubleAnimation(shift.Y, 16, TimeSpan.FromMilliseconds(180))
-        {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
-        };
-        slide.Completed += (_, _) => settingsWindow.Hide();
-        shift.BeginAnimation(TranslateTransform.YProperty, slide);
     }
 
     /// <summary>--render 用:亚克力只在真实窗口生效,渲染时给卡片一个可见底色。</summary>
@@ -775,7 +644,6 @@ public sealed class Flyout
 
     public void Hide()
     {
-        HideSettings();
         if (!window.IsVisible) return;
 
         if (!AnimationsEnabled || card.RenderTransform is not TranslateTransform shift)
@@ -808,7 +676,6 @@ public sealed class Flyout
     /// <summary>主题切换:淡出旧内容 → 换主题 → 淡入新内容,形成平滑过渡。</summary>
     public void ApplyTheme()
     {
-        HideSettings();
         if (AnimationsEnabled && window.IsVisible)
         {
             var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(130)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
