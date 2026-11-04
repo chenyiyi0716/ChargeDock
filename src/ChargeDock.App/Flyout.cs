@@ -599,9 +599,8 @@ public sealed class Flyout
             return;
         }
 
-        // 从任务栏底部弹出:卡片底边从屏幕底部(任务栏下沿)开始滑入,同时淡入
-        double taskbarHeight = Math.Max(0, SystemParameters.PrimaryScreenHeight - wa.Bottom);
-        double startTop = finalTop + 8 + taskbarHeight;
+        // 从任务栏上方弹出:卡片底边从任务栏上沿(工作区底边)开始滑入,同时淡入
+        double startTop = finalTop + 8;
         window.Top = startTop;
         window.Opacity = 0;
         window.Show();
