@@ -725,6 +725,11 @@ public sealed class Flyout
             SetView(false);
             Show();
         }
+        else if (showSettings)
+        {
+            // 卡片已显示但停留在设置页时,切回主页面
+            SetView(false);
+        }
     }
 
     public void Show()
