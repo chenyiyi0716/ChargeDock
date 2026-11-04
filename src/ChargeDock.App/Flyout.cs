@@ -734,15 +734,31 @@ public sealed class Flyout
     {
         var c = new Canvas { Width = 24, Height = 24 };
         var stroke = new SolidColorBrush(color);
-        c.Children.Add(new Ellipse { Width = 6, Height = 6, Stroke = stroke, StrokeThickness = 1.7, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
-        c.Children.Add(Line(12, 2.5, 12, 4.5, stroke, 1.7));
-        c.Children.Add(Line(12, 19.5, 12, 21.5, stroke, 1.7));
-        c.Children.Add(Line(2.5, 12, 4.5, 12, stroke, 1.7));
-        c.Children.Add(Line(19.5, 12, 21.5, 12, stroke, 1.7));
-        c.Children.Add(Line(4.6, 4.6, 6, 6, stroke, 1.7));
-        c.Children.Add(Line(18, 18, 19.4, 19.4, stroke, 1.7));
-        c.Children.Add(Line(4.6, 19.4, 6, 18, stroke, 1.7));
-        c.Children.Add(Line(18, 6, 19.4, 4.6, stroke, 1.7));
+        const double cx = 12, cy = 12;
+
+        // 8 个齿(径向短线,先画在齿轮环下面)
+        for (int i = 0; i < 8; i++)
+        {
+            double a = i * Math.PI / 4;
+            double cos = Math.Cos(a), sin = Math.Sin(a);
+            c.Children.Add(Line(
+                cx + cos * 6.5, cy + sin * 6.5,
+                cx + cos * 9.7, cy + sin * 9.7,
+                stroke, 2.0));
+        }
+
+        // 齿轮主体(环)
+        var ring = new Ellipse { Width = 13, Height = 13, Stroke = stroke, StrokeThickness = 1.9 };
+        Canvas.SetLeft(ring, cx - 6.5);
+        Canvas.SetTop(ring, cy - 6.5);
+        c.Children.Add(ring);
+
+        // 中心孔
+        var hole = new Ellipse { Width = 4.6, Height = 4.6, Stroke = stroke, StrokeThickness = 1.9 };
+        Canvas.SetLeft(hole, cx - 2.3);
+        Canvas.SetTop(hole, cy - 2.3);
+        c.Children.Add(hole);
+
         return c;
     }
 
