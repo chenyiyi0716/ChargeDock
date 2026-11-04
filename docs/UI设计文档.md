@@ -98,3 +98,10 @@
 - 主卡片特写：[ui-card.png](ui-card.png)
 - 设置页特写：[ui-settings.png](ui-settings.png)
 - 托盘菜单特写：[ui-menu.png](ui-menu.png)
+
+## 11. 应用图标
+
+采用 BatteryWatchDemo 的现成图标（绿色电池 + 三格电量条），标准 **7 倍率 ICO**（16/24/32/48/64/128/256），用于主程序 exe、快捷方式与安装包。
+
+- 主程序图标：[src/ChargeDock.App/Assets/icon.ico](../src/ChargeDock.App/Assets/icon.ico)
+- 安装器图标：[src/ChargeDock.Installer/Assets/icon.ico](../src/ChargeDock.Installer/Assets/icon.ico)
