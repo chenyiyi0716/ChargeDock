@@ -100,7 +100,7 @@ public sealed class Flyout
             // 卡片固定贴右下角
             var wa = SystemParameters.WorkArea;
             window.Left = wa.Right - window.Width - 8;
-            window.Top = wa.Bottom - e.NewSize.Height - 8;
+            window.Top = wa.Bottom - e.NewSize.Height;
         };
     }
 
@@ -571,7 +571,7 @@ public sealed class Flyout
         double h = card.DesiredSize.Height > 0 ? card.DesiredSize.Height : 340;
 
         var wa = SystemParameters.WorkArea;
-        double finalTop = wa.Bottom - h - 8;
+        double finalTop = wa.Bottom - h;
         window.Left = wa.Right - window.Width - 8;
         window.Top = finalTop;
         window.Opacity = 1;
